@@ -1,12 +1,12 @@
 #pragma once
-#include <string>
-#include <vector>
+#include "core/biome_theme.hpp"
+#include "core/constants.hpp"
+#include "core/types.hpp"
 #include <expected>
 #include <fstream>
 #include <nlohmann/json.hpp>
-#include "core/types.hpp"
-#include "core/constants.hpp"
-#include "core/biome_theme.hpp"
+#include <string>
+#include <vector>
 
 namespace ls {
 
@@ -26,22 +26,16 @@ struct MapData {
     GridPos exit_pos;
 
     Vec2 grid_to_world(GridPos p) const {
-        return {
-            static_cast<float>(GRID_OFFSET_X + p.x * TILE_SIZE + TILE_SIZE / 2),
-            static_cast<float>(GRID_OFFSET_Y + p.y * TILE_SIZE + TILE_SIZE / 2)
-        };
+        return {static_cast<float>(GRID_OFFSET_X + p.x * TILE_SIZE + TILE_SIZE / 2),
+                static_cast<float>(GRID_OFFSET_Y + p.y * TILE_SIZE + TILE_SIZE / 2)};
     }
 
     GridPos world_to_grid(Vec2 p) const {
-        return {
-            static_cast<int>((p.x - GRID_OFFSET_X) / TILE_SIZE),
-            static_cast<int>((p.y - GRID_OFFSET_Y) / TILE_SIZE)
-        };
+        return {static_cast<int>((p.x - GRID_OFFSET_X) / TILE_SIZE),
+                static_cast<int>((p.y - GRID_OFFSET_Y) / TILE_SIZE)};
     }
 
-    bool in_bounds(GridPos p) const {
-        return p.x >= 0 && p.x < cols && p.y >= 0 && p.y < rows;
-    }
+    bool in_bounds(GridPos p) const { return p.x >= 0 && p.x < cols && p.y >= 0 && p.y < rows; }
 
     TileType tile_at(GridPos p) const {
         if (!in_bounds(p)) return TileType::Blocked;
@@ -67,8 +61,7 @@ struct MapData {
                     GridPos np{x + dx, y + dy};
                     if (in_bounds(np)) {
                         auto t = tile_at(np);
-                        if (t == TileType::Path || t == TileType::Spawn || t == TileType::Exit)
-                            return true;
+                        if (t == TileType::Path || t == TileType::Spawn || t == TileType::Exit) return true;
                     }
                 }
             }
@@ -95,7 +88,10 @@ struct MapData {
                 int r = std::rand() % total_weight;
                 int tex_idx = 0;
                 for (int i = 0; i < 8; ++i) {
-                    if (r < cumulative[i]) { tex_idx = i; break; }
+                    if (r < cumulative[i]) {
+                        tex_idx = i;
+                        break;
+                    }
                 }
                 decorations.push_back({{x, y}, tex_idx});
             }
@@ -104,11 +100,10 @@ struct MapData {
 };
 
 class MapManager {
-public:
+  public:
     std::expected<MapData, std::string> load(const std::string& path) {
         std::ifstream file(path);
-        if (!file.is_open())
-            return std::unexpected("Cannot open map: " + path);
+        if (!file.is_open()) return std::unexpected("Cannot open map: " + path);
 
         try {
             nlohmann::json j;
@@ -121,11 +116,9 @@ public:
 
     const std::vector<std::string>& available_maps() const { return map_names_; }
 
-    void set_available_maps(std::vector<std::string> names) {
-        map_names_ = std::move(names);
-    }
+    void set_available_maps(std::vector<std::string> names) { map_names_ = std::move(names); }
 
-private:
+  private:
     std::vector<std::string> map_names_{"forest", "desert", "castle"};
 
     MapData parse(const nlohmann::json& j) {

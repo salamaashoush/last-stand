@@ -1,9 +1,9 @@
 #pragma once
-#include <vector>
-#include <string>
-#include <optional>
-#include <entt/entt.hpp>
 #include "core/types.hpp"
+#include <entt/entt.hpp>
+#include <optional>
+#include <string>
+#include <vector>
 
 namespace ls {
 
@@ -59,16 +59,16 @@ struct Particle {
 
 struct AnimatedSprite {
     std::string texture_name{};
-    int frame_width{16};      // width of one frame in pixels
-    int frame_height{16};     // height of one frame in pixels
-    int columns{4};           // columns in spritesheet
-    int rows{7};              // rows in spritesheet
-    int current_frame{0};     // current animation frame index (into anim_frames)
-    int direction{0};         // column index: 0=down, 1=up, 2=left, 3=right
+    int frame_width{16};  // width of one frame in pixels
+    int frame_height{16}; // height of one frame in pixels
+    int columns{4};       // columns in spritesheet
+    int rows{7};          // rows in spritesheet
+    int current_frame{0}; // current animation frame index (into anim_frames)
+    int direction{0};     // column index: 0=down, 1=up, 2=left, 3=right
     float frame_timer{0.0f};
-    float frame_speed{6.0f};  // frames per second
+    float frame_speed{6.0f};                  // frames per second
     std::vector<int> anim_frames{0, 1, 2, 3}; // row indices for current animation
-    float display_size{40.0f}; // rendered size on screen
+    float display_size{40.0f};                // rendered size on screen
     bool playing{true};
 };
 

@@ -1,8 +1,8 @@
 #include "upgrade_state.hpp"
-#include "core/game.hpp"
 #include "core/asset_paths.hpp"
-#include <format>
+#include "core/game.hpp"
 #include <cmath>
+#include <format>
 
 namespace ls {
 
@@ -40,8 +40,8 @@ void UpgradeState::update(Game& game, [[maybe_unused]] float dt) {
 
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
         auto& u = game.upgrades;
-        int* levels[] = {&u.attack_range_level, &u.magnet_level, &u.attack_damage_level,
-                         &u.attack_speed_level, &u.max_hp_level};
+        int* levels[] = {&u.attack_range_level, &u.magnet_level, &u.attack_damage_level, &u.attack_speed_level,
+                         &u.max_hp_level};
         int& lev = *levels[selected_];
         int c = u.cost(lev);
         if (lev < HeroUpgrades::MAX_LEVEL && c > 0 && u.upgrade_xp >= c) {
@@ -75,8 +75,7 @@ void UpgradeState::render(Game& game) {
     // Upgrade rows
     const char* names[] = {"Attack Range", "Coin Magnet", "Attack Damage", "Attack Speed", "Max HP"};
     const char* descs[] = {"+30 range/lv", "+40 pickup/lv", "+5 dmg/lv", "-0.04s cd/lv", "+40 HP/lv"};
-    int levels[] = {u.attack_range_level, u.magnet_level, u.attack_damage_level,
-                    u.attack_speed_level, u.max_hp_level};
+    int levels[] = {u.attack_range_level, u.magnet_level, u.attack_damage_level, u.attack_speed_level, u.max_hp_level};
 
     float start_y = 170;
     float row_h = 60;
@@ -93,7 +92,8 @@ void UpgradeState::render(Game& game) {
 
         // Background
         Color bg = is_selected ? Color{40, 50, 70, 220} : Color{30, 30, 45, 200};
-        DrawRectangle(static_cast<int>(box_x), static_cast<int>(y), static_cast<int>(box_w), static_cast<int>(row_h - 4), bg);
+        DrawRectangle(static_cast<int>(box_x), static_cast<int>(y), static_cast<int>(box_w),
+                      static_cast<int>(row_h - 4), bg);
 
         if (is_selected) {
             Color border = affordable ? GREEN : Color{100, 100, 120, 255};
@@ -127,8 +127,8 @@ void UpgradeState::render(Game& game) {
     }
 
     // Instructions
-    up_text(a, "UP/DOWN to select, ENTER to buy, ESC to return",
-            SCREEN_WIDTH / 2.0f - 220, static_cast<float>(SCREEN_HEIGHT - 50), 16, GRAY);
+    up_text(a, "UP/DOWN to select, ENTER to buy, ESC to return", SCREEN_WIDTH / 2.0f - 220,
+            static_cast<float>(SCREEN_HEIGHT - 50), 16, GRAY);
 }
 
 } // namespace ls

@@ -8,6 +8,8 @@ Control a hero who fights enemies directly to earn gold, then build and upgrade 
 ![raylib](https://img.shields.io/badge/raylib-5.5-green)
 ![EnTT](https://img.shields.io/badge/EnTT-3.14-orange)
 
+[**Play in Browser**](https://salamaashoush.github.io/last-stand/)
+
 ## Features
 
 - **Hero combat** -- WASD movement, auto-attack nearby enemies, 3 active abilities (Fire, Heal, Lightning)

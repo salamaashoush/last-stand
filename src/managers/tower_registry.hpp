@@ -1,8 +1,8 @@
 #pragma once
+#include "components/components.hpp"
+#include "core/types.hpp"
 #include <array>
 #include <unordered_map>
-#include "core/types.hpp"
-#include "components/components.hpp"
 
 namespace ls {
 
@@ -23,12 +23,10 @@ struct TowerStats {
 };
 
 class TowerRegistry {
-public:
+  public:
     TowerRegistry() { init(); }
 
-    const TowerStats& get(TowerType type, int level) const {
-        return stats_.at(key(type, level));
-    }
+    const TowerStats& get(TowerType type, int level) const { return stats_.at(key(type, level)); }
 
     int upgrade_cost(TowerType type, int level) const {
         if (level >= 3) return 0;
@@ -37,19 +35,16 @@ public:
 
     static constexpr int MAX_LEVEL = 3;
 
-private:
-    static uint32_t key(TowerType t, int l) {
-        return static_cast<uint32_t>(t) * 10 + l;
-    }
+  private:
+    static uint32_t key(TowerType t, int l) { return static_cast<uint32_t>(t) * 10 + l; }
 
-    void add(TowerStats s) {
-        stats_[key(s.type, s.level)] = s;
-    }
+    void add(TowerStats s) { stats_[key(s.type, s.level)] = s; }
 
     void init() {
         // fire_rate = shots per second for projectile towers
         // fire_rate = seconds between ticks for laser tower
 
+        // clang-format off
         // Arrow Tower - reliable single target DPS
         // L1: 15 DPS, L2: 31 DPS, L3: 53 DPS
         add({TowerType::Arrow, 1, 50,  15, 150, 1.0f, 0, 0, EffectType::None, 0, 1.0f, {200, 150, 50, 255}, "Arrow"});
@@ -85,6 +80,7 @@ private:
         add({TowerType::Laser, 1, 150, 8,  160, 0.05f, 0, 0, EffectType::Burn, 1.0f, 1.0f, {255, 50, 50, 255}, "Laser"});
         add({TowerType::Laser, 2, 225, 12, 180, 0.05f, 0, 0, EffectType::Burn, 1.5f, 1.0f, {255, 80, 80, 255}, "Laser II"});
         add({TowerType::Laser, 3, 375, 18, 200, 0.05f, 0, 0, EffectType::Burn, 2.0f, 1.0f, {255, 110, 110, 255}, "Laser III"});
+        // clang-format on
     }
 
     std::unordered_map<uint32_t, TowerStats> stats_;

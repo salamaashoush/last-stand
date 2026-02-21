@@ -1,7 +1,7 @@
 #pragma once
-#include <entt/entt.hpp>
 #include "components/components.hpp"
 #include "managers/map_manager.hpp"
+#include <entt/entt.hpp>
 
 namespace ls {
 
@@ -21,6 +21,7 @@ inline EnemyStats get_enemy_stats(EnemyType type, float scaling) {
     auto s = [&](int v) { return static_cast<int>(v * scaling); };
     auto sf = [&](float v) { return v; }; // speed doesn't scale
 
+    // clang-format off
     //                 HP         speed   armor                       reward  color                         size    atk  range  cd
     switch (type) {
         case EnemyType::Grunt:
@@ -36,6 +37,7 @@ inline EnemyStats get_enemy_stats(EnemyType type, float scaling) {
         case EnemyType::Boss:
             return {s(1500),sf(28.0f),  static_cast<int>(10*scaling),s(100),{255, 50, 50, 255},  36.0f, s(30),  50.0f, 1.0f};
     }
+    // clang-format on
     return {};
 }
 
@@ -45,7 +47,8 @@ inline AbilityType get_boss_ability(WaveNum wave) {
     return AbilityType::DamageAura;
 }
 
-inline entt::entity create_enemy(entt::registry& reg, EnemyType type, const std::vector<Vec2>& path, float scaling, WaveNum wave = 0) {
+inline entt::entity create_enemy(entt::registry& reg, EnemyType type, const std::vector<Vec2>& path, float scaling,
+                                 WaveNum wave = 0) {
     if (path.empty()) return entt::null;
 
     auto stats = get_enemy_stats(type, scaling);
@@ -56,7 +59,8 @@ inline entt::entity create_enemy(entt::registry& reg, EnemyType type, const std:
     reg.emplace<Sprite>(e, stats.color, 3, stats.size, stats.size, true);
     reg.emplace<Health>(e, stats.hp, stats.hp, stats.armor);
     reg.emplace<HealthBarComp>(e);
-    reg.emplace<Enemy>(e, type, stats.reward, stats.attack_damage, stats.attack_range, stats.attack_cooldown, 0.0f, stats.size * 0.3f);
+    reg.emplace<Enemy>(e, type, stats.reward, stats.attack_damage, stats.attack_range, stats.attack_cooldown, 0.0f,
+                       stats.size * 0.3f);
     reg.emplace<PathFollower>(e, path, size_t{0}, stats.speed, stats.speed);
 
     if (type == EnemyType::Flying) {

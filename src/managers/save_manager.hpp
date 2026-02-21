@@ -1,12 +1,12 @@
 #pragma once
-#include <string>
-#include <fstream>
-#include <expected>
-#include <nlohmann/json.hpp>
-#include <entt/entt.hpp>
 #include "components/components.hpp"
-#include "core/types.hpp"
 #include "core/hero_upgrades.hpp"
+#include "core/types.hpp"
+#include <entt/entt.hpp>
+#include <expected>
+#include <fstream>
+#include <nlohmann/json.hpp>
+#include <string>
 
 namespace ls {
 
@@ -26,7 +26,7 @@ struct SaveData {
 };
 
 class SaveManager {
-public:
+  public:
     std::expected<void, std::string> save(const SaveData& data, const std::string& path) {
         nlohmann::json j;
         j["map"] = data.map_name;
@@ -38,25 +38,18 @@ public:
 
         auto& towers = j["towers"];
         for (auto& t : data.towers) {
-            towers.push_back({
-                {"type", static_cast<int>(t.type)},
-                {"level", t.level},
-                {"x", t.pos.x},
-                {"y", t.pos.y}
-            });
+            towers.push_back({{"type", static_cast<int>(t.type)}, {"level", t.level}, {"x", t.pos.x}, {"y", t.pos.y}});
         }
 
         std::ofstream file(path);
-        if (!file.is_open())
-            return std::unexpected("Cannot write save file: " + path);
+        if (!file.is_open()) return std::unexpected("Cannot write save file: " + path);
         file << j.dump(2);
         return {};
     }
 
     std::expected<SaveData, std::string> load(const std::string& path) {
         std::ifstream file(path);
-        if (!file.is_open())
-            return std::unexpected("Cannot open save file: " + path);
+        if (!file.is_open()) return std::unexpected("Cannot open save file: " + path);
 
         try {
             nlohmann::json j;
@@ -71,11 +64,9 @@ public:
             data.hero_xp = j.at("hero_xp").get<int>();
 
             for (auto& t : j.at("towers")) {
-                data.towers.push_back({
-                    static_cast<TowerType>(t.at("type").get<int>()),
-                    t.at("level").get<int>(),
-                    {t.at("x").get<int>(), t.at("y").get<int>()}
-                });
+                data.towers.push_back({static_cast<TowerType>(t.at("type").get<int>()),
+                                       t.at("level").get<int>(),
+                                       {t.at("x").get<int>(), t.at("y").get<int>()}});
             }
 
             return data;
@@ -92,8 +83,7 @@ public:
         j["speed"] = u.attack_speed_level;
         j["hp"] = u.max_hp_level;
         std::ofstream file(path);
-        if (!file.is_open())
-            return std::unexpected("Cannot write upgrades file: " + path);
+        if (!file.is_open()) return std::unexpected("Cannot write upgrades file: " + path);
         file << j.dump(2);
         return {};
     }

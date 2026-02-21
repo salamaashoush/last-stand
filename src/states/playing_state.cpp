@@ -1,12 +1,12 @@
 #include "playing_state.hpp"
-#include "core/game.hpp"
 #include "core/asset_paths.hpp"
 #include "core/biome_theme.hpp"
-#include "systems/systems.hpp"
+#include "core/game.hpp"
 #include "factory/hero_factory.hpp"
 #include "factory/tower_factory.hpp"
-#include <format>
+#include "systems/systems.hpp"
 #include <cmath>
+#include <format>
 
 namespace ls {
 
@@ -14,8 +14,10 @@ namespace ls {
 static void on_enemy_death(Game& g, const EnemyDeathEvent& evt) {
     Gold reward = evt.reward;
     // Apply difficulty gold modifier
-    if (g.difficulty == Difficulty::Easy) reward = static_cast<Gold>(reward * 1.2f);
-    else if (g.difficulty == Difficulty::Hard) reward = static_cast<Gold>(reward * 0.8f);
+    if (g.difficulty == Difficulty::Easy)
+        reward = static_cast<Gold>(reward * 1.2f);
+    else if (g.difficulty == Difficulty::Hard)
+        reward = static_cast<Gold>(reward * 0.8f);
 
     g.play.total_kills++;
     g.play.stats.total_kills++;
@@ -100,18 +102,18 @@ void PlayingState::enter(Game& game) {
 
     // Apply difficulty modifiers (all start 0 gold - earn by fighting)
     switch (game.difficulty) {
-        case Difficulty::Easy:
-            game.play.gold = 0;
-            game.play.lives = 30;
-            break;
-        case Difficulty::Normal:
-            game.play.gold = 0;
-            game.play.lives = STARTING_LIVES;
-            break;
-        case Difficulty::Hard:
-            game.play.gold = 0;
-            game.play.lives = 10;
-            break;
+    case Difficulty::Easy:
+        game.play.gold = 0;
+        game.play.lives = 30;
+        break;
+    case Difficulty::Normal:
+        game.play.gold = 0;
+        game.play.lives = STARTING_LIVES;
+        break;
+    case Difficulty::Hard:
+        game.play.gold = 0;
+        game.play.lives = 10;
+        break;
     }
 
     // Create hero at spawn
@@ -281,10 +283,8 @@ void PlayingState::handle_input(Game& game) {
     }
 
     // Tower hotkeys (1-6)
-    TowerType hotkey_towers[] = {
-        TowerType::Arrow, TowerType::Cannon, TowerType::Ice,
-        TowerType::Lightning, TowerType::Poison, TowerType::Laser
-    };
+    TowerType hotkey_towers[] = {TowerType::Arrow,     TowerType::Cannon, TowerType::Ice,
+                                 TowerType::Lightning, TowerType::Poison, TowerType::Laser};
     for (int i = 0; i < 6; ++i) {
         if (IsKeyPressed(KEY_ONE + i)) {
             auto& stats = game.tower_registry.get(hotkey_towers[i], 1);
@@ -371,8 +371,8 @@ void PlayingState::update(Game& game, float dt) {
         auto& biome = get_biome_theme(game.current_map.name);
         Music* biome_music = game.assets.get_music(biome.music_track);
         Music* boss_music = game.assets.get_music(assets::MUSIC_BOSS);
-        bool is_boss_wave = game.play.wave_active && game.play.current_wave > 0
-            && (game.play.current_wave % BOSS_WAVE_INTERVAL == 0);
+        bool is_boss_wave =
+            game.play.wave_active && game.play.current_wave > 0 && (game.play.current_wave % BOSS_WAVE_INTERVAL == 0);
         // Only switch to boss music if the biome's normal track is different from boss
         if (biome_music != boss_music) {
             if (is_boss_wave && boss_music && game.current_music != boss_music) {
@@ -380,8 +380,8 @@ void PlayingState::update(Game& game, float dt) {
                 PlayMusicStream(*boss_music);
                 SetMusicVolume(*boss_music, game.music_muted ? 0.0f : game.music_volume);
                 game.current_music = boss_music;
-            } else if (!is_boss_wave && biome_music && game.current_music != biome_music
-                       && game.current_music == boss_music) {
+            } else if (!is_boss_wave && biome_music && game.current_music != biome_music &&
+                       game.current_music == boss_music) {
                 StopMusicStream(*boss_music);
                 PlayMusicStream(*biome_music);
                 SetMusicVolume(*biome_music, game.music_muted ? 0.0f : game.music_volume);

@@ -1,6 +1,6 @@
 #include "gameover_state.hpp"
-#include "core/game.hpp"
 #include "core/asset_paths.hpp"
+#include "core/game.hpp"
 #include <format>
 
 namespace ls {
@@ -50,20 +50,30 @@ static void render_stats(Game& game, int base_y) {
     int minutes = static_cast<int>(st.time_elapsed) / 60;
     int seconds = static_cast<int>(st.time_elapsed) % 60;
 
-    go_text(a, std::format("Time Played: {}:{:02d}", minutes, seconds).c_str(), x, y, 16, WHITE); y += spacing;
-    go_text(a, std::format("Enemies Killed: {}", st.total_kills).c_str(), x, y, 16, WHITE); y += spacing;
-    go_text(a, std::format("Boss Kills: {}", st.boss_kills).c_str(), x, y, 16, RED); y += spacing;
-    go_text(a, std::format("Gold Earned: {}", st.gold_earned).c_str(), x, y, 16, GOLD); y += spacing;
-    go_text(a, std::format("Gold Spent: {}", st.gold_spent).c_str(), x, y, 16, GOLD); y += spacing;
-    go_text(a, std::format("Towers Built: {}", st.towers_built).c_str(), x, y, 16, WHITE); y += spacing;
-    go_text(a, std::format("Towers Sold: {}", st.towers_sold).c_str(), x, y, 16, WHITE); y += spacing;
+    go_text(a, std::format("Time Played: {}:{:02d}", minutes, seconds).c_str(), x, y, 16, WHITE);
+    y += spacing;
+    go_text(a, std::format("Enemies Killed: {}", st.total_kills).c_str(), x, y, 16, WHITE);
+    y += spacing;
+    go_text(a, std::format("Boss Kills: {}", st.boss_kills).c_str(), x, y, 16, RED);
+    y += spacing;
+    go_text(a, std::format("Gold Earned: {}", st.gold_earned).c_str(), x, y, 16, GOLD);
+    y += spacing;
+    go_text(a, std::format("Gold Spent: {}", st.gold_spent).c_str(), x, y, 16, GOLD);
+    y += spacing;
+    go_text(a, std::format("Towers Built: {}", st.towers_built).c_str(), x, y, 16, WHITE);
+    y += spacing;
+    go_text(a, std::format("Towers Sold: {}", st.towers_sold).c_str(), x, y, 16, WHITE);
+    y += spacing;
     go_text(a, std::format("Hero Deaths: {}", st.hero_deaths).c_str(), x, y, 16, LIGHTGRAY);
 }
 
 void GameOverState::update(Game& game, [[maybe_unused]] float dt) {
     if (game.current_music) UpdateMusicStream(*game.current_music);
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-        if (game.current_music) { StopMusicStream(*game.current_music); game.current_music = nullptr; }
+        if (game.current_music) {
+            StopMusicStream(*game.current_music);
+            game.current_music = nullptr;
+        }
         game.state_machine.change_state(GameStateId::Menu, game);
     }
 }
@@ -75,14 +85,12 @@ void GameOverState::render(Game& game) {
     auto title = "GAME OVER";
     float tw = go_measure(a, title, 48);
     go_text(a, title, SCREEN_WIDTH / 2.0f - tw / 2, 80, 48, RED);
-    go_text(a, std::format("Survived {} waves", game.play.current_wave).c_str(),
-            SCREEN_WIDTH / 2.0f - 100, 140, 24, WHITE);
-    go_text(a, std::format("Gold remaining: {}", game.play.gold).c_str(),
-            SCREEN_WIDTH / 2.0f - 90, 175, 20, GOLD);
-    go_text(a, std::format("Lives remaining: {}", game.play.lives).c_str(),
-            SCREEN_WIDTH / 2.0f - 90, 200, 20, GREEN);
-    go_text(a, std::format("XP Earned: +{}", xp_earned_).c_str(),
-            SCREEN_WIDTH / 2.0f - 70, 228, 20, {100, 200, 255, 255});
+    go_text(a, std::format("Survived {} waves", game.play.current_wave).c_str(), SCREEN_WIDTH / 2.0f - 100, 140, 24,
+            WHITE);
+    go_text(a, std::format("Gold remaining: {}", game.play.gold).c_str(), SCREEN_WIDTH / 2.0f - 90, 175, 20, GOLD);
+    go_text(a, std::format("Lives remaining: {}", game.play.lives).c_str(), SCREEN_WIDTH / 2.0f - 90, 200, 20, GREEN);
+    go_text(a, std::format("XP Earned: +{}", xp_earned_).c_str(), SCREEN_WIDTH / 2.0f - 70, 228, 20,
+            {100, 200, 255, 255});
 
     render_stats(game, 260);
 
@@ -94,7 +102,10 @@ void GameOverState::render(Game& game) {
 void VictoryState::update(Game& game, [[maybe_unused]] float dt) {
     if (game.current_music) UpdateMusicStream(*game.current_music);
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
-        if (game.current_music) { StopMusicStream(*game.current_music); game.current_music = nullptr; }
+        if (game.current_music) {
+            StopMusicStream(*game.current_music);
+            game.current_music = nullptr;
+        }
         game.state_machine.change_state(GameStateId::Menu, game);
     }
 }
@@ -107,12 +118,10 @@ void VictoryState::render(Game& game) {
     float tw = go_measure(a, title, 48);
     go_text(a, title, SCREEN_WIDTH / 2.0f - tw / 2, 80, 48, GOLD);
     go_text(a, "You survived all 30 waves!", SCREEN_WIDTH / 2.0f - 120, 140, 24, WHITE);
-    go_text(a, std::format("Gold remaining: {}", game.play.gold).c_str(),
-            SCREEN_WIDTH / 2.0f - 90, 175, 20, GOLD);
-    go_text(a, std::format("Lives remaining: {}", game.play.lives).c_str(),
-            SCREEN_WIDTH / 2.0f - 90, 200, 20, GREEN);
-    go_text(a, std::format("XP Earned: +{}", xp_earned_).c_str(),
-            SCREEN_WIDTH / 2.0f - 70, 228, 20, {100, 200, 255, 255});
+    go_text(a, std::format("Gold remaining: {}", game.play.gold).c_str(), SCREEN_WIDTH / 2.0f - 90, 175, 20, GOLD);
+    go_text(a, std::format("Lives remaining: {}", game.play.lives).c_str(), SCREEN_WIDTH / 2.0f - 90, 200, 20, GREEN);
+    go_text(a, std::format("XP Earned: +{}", xp_earned_).c_str(), SCREEN_WIDTH / 2.0f - 70, 228, 20,
+            {100, 200, 255, 255});
 
     render_stats(game, 260);
 

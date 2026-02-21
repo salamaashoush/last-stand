@@ -1,31 +1,25 @@
 #pragma once
-#include <vector>
-#include <queue>
-#include <unordered_set>
-#include <unordered_map>
-#include <cmath>
-#include <algorithm>
-#include <functional>
 #include "core/types.hpp"
 #include "managers/map_manager.hpp"
+#include <algorithm>
+#include <cmath>
+#include <functional>
+#include <queue>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 namespace ls {
 
 struct GridPosHash {
-    size_t operator()(GridPos p) const {
-        return std::hash<int>()(p.x) ^ (std::hash<int>()(p.y) << 16);
-    }
+    size_t operator()(GridPos p) const { return std::hash<int>()(p.x) ^ (std::hash<int>()(p.y) << 16); }
 };
 
 class Pathfinder {
-public:
+  public:
     // blocked_tiles are positions occupied by towers
-    static std::vector<Vec2> find_path(
-        const MapData& map,
-        GridPos start,
-        GridPos goal,
-        const std::unordered_set<GridPos, GridPosHash>& blocked_tiles = {}
-    ) {
+    static std::vector<Vec2> find_path(const MapData& map, GridPos start, GridPos goal,
+                                       const std::unordered_set<GridPos, GridPosHash>& blocked_tiles = {}) {
         using Node = std::pair<float, GridPos>; // cost, pos
         std::priority_queue<Node, std::vector<Node>, std::greater<>> open;
         std::unordered_map<GridPos, GridPos, GridPosHash> came_from;
@@ -34,7 +28,7 @@ public:
         open.push({0, start});
         cost_so_far[start] = 0;
 
-        constexpr GridPos dirs[] = {{0,-1},{0,1},{-1,0},{1,0}};
+        constexpr GridPos dirs[] = {{0, -1}, {0, 1}, {-1, 0}, {1, 0}};
 
         while (!open.empty()) {
             auto [_, current] = open.top();
@@ -75,11 +69,8 @@ public:
     }
 
     // Check if placing a tower would block the path
-    static bool would_block_path(
-        const MapData& map,
-        GridPos tower_pos,
-        const std::unordered_set<GridPos, GridPosHash>& existing_towers
-    ) {
+    static bool would_block_path(const MapData& map, GridPos tower_pos,
+                                 const std::unordered_set<GridPos, GridPosHash>& existing_towers) {
         auto blocked = existing_towers;
         blocked.insert(tower_pos);
         auto path = find_path(map, map.spawn, map.exit_pos, blocked);

@@ -1,13 +1,13 @@
 #pragma once
-#include "core/state_machine.hpp"
 #include "core/constants.hpp"
+#include "core/state_machine.hpp"
 #include <raylib.h>
 #include <vector>
 
 namespace ls {
 
 class MenuState : public IGameState {
-public:
+  public:
     void enter(Game& game) override;
     void exit(Game&) override {}
     GameStateId id() const override { return GameStateId::Menu; }
@@ -15,7 +15,7 @@ public:
     void update(Game& game, float dt) override;
     void render(Game& game) override;
 
-private:
+  private:
     struct MenuItem {
         const char* label;
         enum Action { ResumeGame, NewGame, LoadGame, Upgrades, Quit } action;

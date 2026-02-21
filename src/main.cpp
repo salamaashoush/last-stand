@@ -1,11 +1,27 @@
-#include <raylib.h>
 #include "core/game.hpp"
-#include "states/menu_state.hpp"
-#include "states/map_select_state.hpp"
-#include "states/playing_state.hpp"
-#include "states/paused_state.hpp"
 #include "states/gameover_state.hpp"
+#include "states/map_select_state.hpp"
+#include "states/menu_state.hpp"
+#include "states/paused_state.hpp"
+#include "states/playing_state.hpp"
 #include "states/upgrade_state.hpp"
+#include <raylib.h>
+
+#ifdef __EMSCRIPTEN__
+#include <emscripten/emscripten.h>
+
+static ls::Game* g_game = nullptr;
+
+static void main_loop() {
+    float dt = GetFrameTime();
+    g_game->state_machine.update(*g_game, dt);
+
+    BeginDrawing();
+    g_game->state_machine.render(*g_game);
+    DrawFPS(ls::SCREEN_WIDTH - 80, ls::SCREEN_HEIGHT - 20);
+    EndDrawing();
+}
+#endif
 
 int main() {
     InitWindow(ls::SCREEN_WIDTH, ls::SCREEN_HEIGHT, "Last Stand - Tower Defense");
@@ -27,6 +43,10 @@ int main() {
     game.upgrades = game.save_manager.load_upgrades("upgrades.json");
     game.state_machine.change_state(ls::GameStateId::Menu, game);
 
+#ifdef __EMSCRIPTEN__
+    g_game = &game;
+    emscripten_set_main_loop(main_loop, 0, 1);
+#else
     while (!WindowShouldClose() && game.running) {
         float dt = GetFrameTime();
         game.state_machine.update(game, dt);
@@ -41,5 +61,6 @@ int main() {
     game.sounds.cleanup();
     CloseAudioDevice();
     CloseWindow();
+#endif
     return 0;
 }

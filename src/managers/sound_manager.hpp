@@ -1,37 +1,48 @@
 #pragma once
-#include <raylib.h>
 #include <cmath>
 #include <cstring>
+#include <raylib.h>
 #include <vector>
 
 namespace ls {
 
 class SoundManager {
-public:
+  public:
     void init() {
-        arrow_fire   = gen_sweep(800, 400, 0.08f, WaveTriangle);
-        cannon_fire  = gen_cannon(0.15f);
-        ice_fire     = gen_sweep(2000, 500, 0.12f, WaveSine);
+        arrow_fire = gen_sweep(800, 400, 0.08f, WaveTriangle);
+        cannon_fire = gen_cannon(0.15f);
+        ice_fire = gen_sweep(2000, 500, 0.12f, WaveSine);
         lightning_fire = gen_noise_burst(0.06f);
-        poison_fire  = gen_am_sine(200, 0.1f);
-        laser_hum    = gen_sine(440, 0.05f);
-        enemy_death  = gen_noise_decay(0.1f);
-        boss_death   = gen_rumble(0.5f);
-        tower_place  = gen_sweep(400, 800, 0.1f, WaveSine);
-        wave_start   = gen_sine(600, 0.3f);
+        poison_fire = gen_am_sine(200, 0.1f);
+        laser_hum = gen_sine(440, 0.05f);
+        enemy_death = gen_noise_decay(0.1f);
+        boss_death = gen_rumble(0.5f);
+        tower_place = gen_sweep(400, 800, 0.1f, WaveSine);
+        wave_start = gen_sine(600, 0.3f);
         hero_ability = gen_chord(0.15f);
-        ui_click     = gen_sine(1000, 0.03f);
-        enemy_hit    = gen_noise_burst(0.04f);
+        ui_click = gen_sine(1000, 0.03f);
+        enemy_hit = gen_noise_burst(0.04f);
         initialized_ = true;
     }
 
     void cleanup() {
         if (!initialized_) return;
-        auto unload = [](Sound& s) { if (s.frameCount > 0) UnloadSound(s); s.frameCount = 0; };
-        unload(arrow_fire); unload(cannon_fire); unload(ice_fire);
-        unload(lightning_fire); unload(poison_fire); unload(laser_hum);
-        unload(enemy_death); unload(boss_death); unload(tower_place);
-        unload(wave_start); unload(hero_ability); unload(ui_click);
+        auto unload = [](Sound& s) {
+            if (s.frameCount > 0) UnloadSound(s);
+            s.frameCount = 0;
+        };
+        unload(arrow_fire);
+        unload(cannon_fire);
+        unload(ice_fire);
+        unload(lightning_fire);
+        unload(poison_fire);
+        unload(laser_hum);
+        unload(enemy_death);
+        unload(boss_death);
+        unload(tower_place);
+        unload(wave_start);
+        unload(hero_ability);
+        unload(ui_click);
         unload(enemy_hit);
         initialized_ = false;
     }
@@ -59,18 +70,19 @@ public:
     Sound ui_click{};
     Sound enemy_hit{};
 
-private:
+  private:
     static constexpr int SAMPLE_RATE = 44100;
 
     enum WaveType { WaveSine, WaveTriangle };
 
     static float wave_sample(WaveType type, float phase) {
         switch (type) {
-            case WaveSine: return std::sin(phase * 2.0f * PI);
-            case WaveTriangle: {
-                float t = std::fmod(phase, 1.0f);
-                return (t < 0.5f) ? (4.0f * t - 1.0f) : (3.0f - 4.0f * t);
-            }
+        case WaveSine:
+            return std::sin(phase * 2.0f * PI);
+        case WaveTriangle: {
+            float t = std::fmod(phase, 1.0f);
+            return (t < 0.5f) ? (4.0f * t - 1.0f) : (3.0f - 4.0f * t);
+        }
         }
         return 0.0f;
     }

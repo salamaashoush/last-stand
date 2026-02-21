@@ -1,21 +1,21 @@
 #pragma once
-#include <entt/entt.hpp>
-#include <unordered_set>
-#include <optional>
-#include <string>
-#include "types.hpp"
+#include "ai/pathfinding.hpp"
 #include "constants.hpp"
+#include "core/asset_paths.hpp"
+#include "core/hero_upgrades.hpp"
 #include "event_bus.hpp"
-#include "state_machine.hpp"
 #include "managers/asset_manager.hpp"
 #include "managers/map_manager.hpp"
-#include "managers/wave_manager.hpp"
-#include "managers/tower_registry.hpp"
 #include "managers/save_manager.hpp"
-#include "core/hero_upgrades.hpp"
 #include "managers/sound_manager.hpp"
-#include "ai/pathfinding.hpp"
-#include "core/asset_paths.hpp"
+#include "managers/tower_registry.hpp"
+#include "managers/wave_manager.hpp"
+#include "state_machine.hpp"
+#include "types.hpp"
+#include <entt/entt.hpp>
+#include <optional>
+#include <string>
+#include <unordered_set>
 
 namespace ls {
 
@@ -130,9 +130,7 @@ struct Game {
         return Vec2::from_raylib(wp);
     }
 
-    GridPos mouse_grid() const {
-        return current_map.world_to_grid(mouse_world());
-    }
+    GridPos mouse_grid() const { return current_map.world_to_grid(mouse_world()); }
 };
 
 inline void load_assets(Game& game) {
@@ -168,48 +166,48 @@ inline void load_assets(Game& game) {
     };
 
     // Terrain tiles
-    load_tex(TILE_GRASS,     td("towerDefense_tile024.png"));
+    load_tex(TILE_GRASS, td("towerDefense_tile024.png"));
     load_tex(TILE_BUILDABLE, td("towerDefense_tile133.png"));
-    load_tex(TILE_PATH,      td("towerDefense_tile050.png"));
-    load_tex(TILE_SPAWN,     td("towerDefense_tile044.png"));
-    load_tex(TILE_EXIT,      td("towerDefense_tile045.png"));
-    load_tex(TILE_BLOCKED,   td("towerDefense_tile256.png"));
+    load_tex(TILE_PATH, td("towerDefense_tile050.png"));
+    load_tex(TILE_SPAWN, td("towerDefense_tile044.png"));
+    load_tex(TILE_EXIT, td("towerDefense_tile045.png"));
+    load_tex(TILE_BLOCKED, td("towerDefense_tile256.png"));
 
     // Decorations
-    load_tex(DECO_TREE_BIG,  td("towerDefense_tile130.png"));
-    load_tex(DECO_BUSH,      td("towerDefense_tile131.png"));
-    load_tex(DECO_LEAF,      td("towerDefense_tile132.png"));
-    load_tex(DECO_FLOWER,    td("towerDefense_tile134.png"));
-    load_tex(DECO_ROCK_SM,   td("towerDefense_tile135.png"));
-    load_tex(DECO_ROCK_MD,   td("towerDefense_tile136.png"));
-    load_tex(DECO_ROCK_LG,   td("towerDefense_tile137.png"));
-    load_tex(DECO_FLAME,     td("towerDefense_tile295.png"));
+    load_tex(DECO_TREE_BIG, td("towerDefense_tile130.png"));
+    load_tex(DECO_BUSH, td("towerDefense_tile131.png"));
+    load_tex(DECO_LEAF, td("towerDefense_tile132.png"));
+    load_tex(DECO_FLOWER, td("towerDefense_tile134.png"));
+    load_tex(DECO_ROCK_SM, td("towerDefense_tile135.png"));
+    load_tex(DECO_ROCK_MD, td("towerDefense_tile136.png"));
+    load_tex(DECO_ROCK_LG, td("towerDefense_tile137.png"));
+    load_tex(DECO_FLAME, td("towerDefense_tile295.png"));
 
     // Biome-specific tiles
     load_tex(BIOME_DESERT_GROUND, td("towerDefense_tile160.png"));
     load_tex(BIOME_CASTLE_GROUND, td("towerDefense_tile159.png"));
-    load_tex(BIOME_CASTLE_PATH,   td("towerDefense_tile158.png"));
+    load_tex(BIOME_CASTLE_PATH, td("towerDefense_tile158.png"));
 
     // Tower bases
-    load_tex(TOWER_BASE_L1,  td("towerDefense_tile180.png"));
-    load_tex(TOWER_BASE_L2,  td("towerDefense_tile181.png"));
-    load_tex(TOWER_BASE_L3,  td("towerDefense_tile183.png"));
+    load_tex(TOWER_BASE_L1, td("towerDefense_tile180.png"));
+    load_tex(TOWER_BASE_L2, td("towerDefense_tile181.png"));
+    load_tex(TOWER_BASE_L3, td("towerDefense_tile183.png"));
 
     // Tower weapons
-    load_tex(TOWER_ARROW,    td("towerDefense_tile249.png"));
-    load_tex(TOWER_CANNON,   td("towerDefense_tile204.png"));
-    load_tex(TOWER_ICE,      td("towerDefense_tile246.png"));
+    load_tex(TOWER_ARROW, td("towerDefense_tile249.png"));
+    load_tex(TOWER_CANNON, td("towerDefense_tile204.png"));
+    load_tex(TOWER_ICE, td("towerDefense_tile246.png"));
     load_tex(TOWER_LIGHTNING, td("towerDefense_tile206.png"));
-    load_tex(TOWER_POISON,   td("towerDefense_tile291.png"));
-    load_tex(TOWER_LASER,    td("towerDefense_tile250.png"));
+    load_tex(TOWER_POISON, td("towerDefense_tile291.png"));
+    load_tex(TOWER_LASER, td("towerDefense_tile250.png"));
 
     // Enemies - using vehicle/unit sprites from TD pack
-    load_tex(ENEMY_GRUNT,    td("towerDefense_tile245.png"));  // green armored vehicle
-    load_tex(ENEMY_RUNNER,   td("towerDefense_tile270.png"));  // green plane (fast)
-    load_tex(ENEMY_TANK,     td("towerDefense_tile247.png"));  // brown heavy vehicle
-    load_tex(ENEMY_HEALER,   td("towerDefense_tile248.png"));  // grey support vehicle
-    load_tex(ENEMY_FLYING,   td("towerDefense_tile271.png"));  // grey plane
-    load_tex(ENEMY_BOSS,     td("towerDefense_tile252.png"));  // red rocket
+    load_tex(ENEMY_GRUNT, td("towerDefense_tile245.png"));  // green armored vehicle
+    load_tex(ENEMY_RUNNER, td("towerDefense_tile270.png")); // green plane (fast)
+    load_tex(ENEMY_TANK, td("towerDefense_tile247.png"));   // brown heavy vehicle
+    load_tex(ENEMY_HEALER, td("towerDefense_tile248.png")); // grey support vehicle
+    load_tex(ENEMY_FLYING, td("towerDefense_tile271.png")); // grey plane
+    load_tex(ENEMY_BOSS, td("towerDefense_tile252.png"));   // red rocket
 
     // Hero
     load_tex(HERO_SPRITE, std::string(NINJA_BASE) + "content/character/ninja_blue/sprite.png");
@@ -218,19 +216,19 @@ inline void load_assets(Game& game) {
     load_tex(COIN_SPRITE, td("towerDefense_tile272.png"));
 
     // Projectiles
-    load_tex(PROJ_ARROW,     td("towerDefense_tile272.png"));
-    load_tex(PROJ_CANNON,    td("towerDefense_tile272.png"));
-    load_tex(PROJ_ICE,       pt("circle_02.png"));
+    load_tex(PROJ_ARROW, td("towerDefense_tile272.png"));
+    load_tex(PROJ_CANNON, td("towerDefense_tile272.png"));
+    load_tex(PROJ_ICE, pt("circle_02.png"));
     load_tex(PROJ_LIGHTNING, pt("spark_05.png"));
-    load_tex(PROJ_POISON,    pt("circle_01.png"));
+    load_tex(PROJ_POISON, pt("circle_01.png"));
 
     // Particles
-    load_tex(PART_FLAME,     pt("flame_01.png"));
-    load_tex(PART_SMOKE,     pt("smoke_04.png"));
-    load_tex(PART_SPARK,     pt("spark_01.png"));
-    load_tex(PART_MAGIC,     pt("magic_01.png"));
-    load_tex(PART_MUZZLE,    pt("muzzle_01.png"));
-    load_tex(PART_CIRCLE,    pt("circle_01.png"));
+    load_tex(PART_FLAME, pt("flame_01.png"));
+    load_tex(PART_SMOKE, pt("smoke_04.png"));
+    load_tex(PART_SPARK, pt("spark_01.png"));
+    load_tex(PART_MAGIC, pt("magic_01.png"));
+    load_tex(PART_MUZZLE, pt("muzzle_01.png"));
+    load_tex(PART_CIRCLE, pt("circle_01.png"));
 
     // Font
     load_fnt(FONT_MAIN, std::string(UI_BASE) + "Font/Kenney Future.ttf");
@@ -239,10 +237,10 @@ inline void load_assets(Game& game) {
     load_snd(SND_CLICK, std::string(UI_BASE) + "Sounds/click-a.ogg");
 
     // Music
-    load_mus(MUSIC_MENU,  std::string(NINJA_BASE) + "audio/music/theme_dream.ogg");
+    load_mus(MUSIC_MENU, std::string(NINJA_BASE) + "audio/music/theme_dream.ogg");
     load_mus(MUSIC_PLAIN, std::string(NINJA_BASE) + "audio/music/theme_plain.ogg");
     load_mus(MUSIC_SWAMP, std::string(NINJA_BASE) + "audio/music/theme_swamp.ogg");
-    load_mus(MUSIC_BOSS,  std::string(NINJA_BASE) + "audio/music/theme_lost_village.ogg");
+    load_mus(MUSIC_BOSS, std::string(NINJA_BASE) + "audio/music/theme_lost_village.ogg");
 }
 
 } // namespace ls

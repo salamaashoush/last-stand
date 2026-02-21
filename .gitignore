@@ -1,4 +1,6 @@
 build/
+build-test/
+build-web/
 .cache/
 compile_commands.json
 save.json

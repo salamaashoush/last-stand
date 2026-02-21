@@ -1,7 +1,9 @@
 #pragma once
 
 // Forward declare Game
-namespace ls { struct Game; }
+namespace ls {
+struct Game;
+}
 
 namespace ls::systems {
 

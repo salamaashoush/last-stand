@@ -1,6 +1,6 @@
 #include "menu_state.hpp"
-#include "core/game.hpp"
 #include "core/asset_paths.hpp"
+#include "core/game.hpp"
 #include <cmath>
 #include <format>
 
@@ -55,8 +55,10 @@ void MenuState::update(Game& game, float dt) {
 
     auto play_click = [&]() {
         Sound* click = game.assets.get_sound(assets::SND_CLICK);
-        if (click) PlaySound(*click);
-        else game.sounds.play(game.sounds.ui_click);
+        if (click)
+            PlaySound(*click);
+        else
+            game.sounds.play(game.sounds.ui_click);
     };
 
     int count = static_cast<int>(items_.size());
@@ -74,55 +76,55 @@ void MenuState::update(Game& game, float dt) {
         play_click();
         auto action = items_[selected_].action;
         switch (action) {
-            case MenuItem::ResumeGame: {
-                // Resume the in-progress game
-                Music* gameplay_music = game.assets.get_music(assets::MUSIC_PLAIN);
-                if (gameplay_music) {
-                    if (game.current_music) StopMusicStream(*game.current_music);
-                    PlayMusicStream(*gameplay_music);
-                    SetMusicVolume(*gameplay_music, game.music_muted ? 0.0f : game.music_volume);
-                    game.current_music = gameplay_music;
-                }
-                game.state_machine.resume_state(GameStateId::Playing, game);
-                break;
-            }
-            case MenuItem::NewGame:
-                game.state_machine.set_active_game(false);
+        case MenuItem::ResumeGame: {
+            // Resume the in-progress game
+            Music* gameplay_music = game.assets.get_music(assets::MUSIC_PLAIN);
+            if (gameplay_music) {
                 if (game.current_music) StopMusicStream(*game.current_music);
-                game.current_music = nullptr;
-                game.state_machine.change_state(GameStateId::MapSelect, game);
-                break;
-            case MenuItem::LoadGame: {
-                auto result = game.save_manager.load(game.save_path);
-                if (result) {
-                    game.pending_load = std::move(*result);
-                    std::string name = game.pending_load->map_name;
-                    std::string lower_name = name;
-                    for (auto& ch : lower_name) ch = static_cast<char>(std::tolower(ch));
-                    auto map_result = game.map_manager.load("assets/maps/" + lower_name + ".json");
-                    if (!map_result) {
-                        map_result = game.map_manager.load("assets/maps/" + name + ".json");
-                    }
-                    if (map_result) {
-                        game.current_map = std::move(*map_result);
-                        if (game.current_music) StopMusicStream(*game.current_music);
-                        game.current_music = nullptr;
-                        game.state_machine.set_active_game(true);
-                        game.state_machine.change_state(GameStateId::Playing, game);
-                    } else {
-                        load_error_flash_ = 2.0f;
-                    }
+                PlayMusicStream(*gameplay_music);
+                SetMusicVolume(*gameplay_music, game.music_muted ? 0.0f : game.music_volume);
+                game.current_music = gameplay_music;
+            }
+            game.state_machine.resume_state(GameStateId::Playing, game);
+            break;
+        }
+        case MenuItem::NewGame:
+            game.state_machine.set_active_game(false);
+            if (game.current_music) StopMusicStream(*game.current_music);
+            game.current_music = nullptr;
+            game.state_machine.change_state(GameStateId::MapSelect, game);
+            break;
+        case MenuItem::LoadGame: {
+            auto result = game.save_manager.load(game.save_path);
+            if (result) {
+                game.pending_load = std::move(*result);
+                std::string name = game.pending_load->map_name;
+                std::string lower_name = name;
+                for (auto& ch : lower_name) ch = static_cast<char>(std::tolower(ch));
+                auto map_result = game.map_manager.load("assets/maps/" + lower_name + ".json");
+                if (!map_result) {
+                    map_result = game.map_manager.load("assets/maps/" + name + ".json");
+                }
+                if (map_result) {
+                    game.current_map = std::move(*map_result);
+                    if (game.current_music) StopMusicStream(*game.current_music);
+                    game.current_music = nullptr;
+                    game.state_machine.set_active_game(true);
+                    game.state_machine.change_state(GameStateId::Playing, game);
                 } else {
                     load_error_flash_ = 2.0f;
                 }
-                break;
+            } else {
+                load_error_flash_ = 2.0f;
             }
-            case MenuItem::Upgrades:
-                game.state_machine.change_state(GameStateId::Upgrades, game);
-                break;
-            case MenuItem::Quit:
-                game.running = false;
-                break;
+            break;
+        }
+        case MenuItem::Upgrades:
+            game.state_machine.change_state(GameStateId::Upgrades, game);
+            break;
+        case MenuItem::Quit:
+            game.running = false;
+            break;
         }
     }
 
@@ -180,7 +182,8 @@ void MenuState::render(Game& game) {
     }
 
     menu_text(a, "Press ENTER to select", SCREEN_WIDTH / 2.0f - 100, 580, 16, GRAY);
-    menu_text(a, "v0.4.0 - Built with Raylib + EnTT", SCREEN_WIDTH / 2.0f - 130, static_cast<float>(SCREEN_HEIGHT - 30), 14, DARKGRAY);
+    menu_text(a, "v0.4.0 - Built with Raylib + EnTT", SCREEN_WIDTH / 2.0f - 130, static_cast<float>(SCREEN_HEIGHT - 30),
+              14, DARKGRAY);
 }
 
 } // namespace ls

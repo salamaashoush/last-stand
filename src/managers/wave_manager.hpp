@@ -1,8 +1,8 @@
 #pragma once
-#include <vector>
-#include <cmath>
-#include "core/types.hpp"
 #include "core/constants.hpp"
+#include "core/types.hpp"
+#include <cmath>
+#include <vector>
 
 namespace ls {
 
@@ -19,7 +19,7 @@ struct WaveData {
 };
 
 class WaveManager {
-public:
+  public:
     WaveManager() { generate_waves(); }
 
     const WaveData& get_wave(WaveNum n) const {
@@ -33,7 +33,7 @@ public:
         return 1.0f + (wave - 1) * 0.3f + (wave > 15 ? (wave - 15) * 0.15f : 0.0f);
     }
 
-private:
+  private:
     void generate_waves() {
         waves_.reserve(MAX_WAVES);
         for (WaveNum w = 1; w <= MAX_WAVES; ++w) {

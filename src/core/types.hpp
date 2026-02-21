@@ -1,8 +1,8 @@
 #pragma once
-#include <cstdint>
 #include <cmath>
-#include <string>
+#include <cstdint>
 #include <raylib.h>
+#include <string>
 
 namespace ls {
 
@@ -35,73 +35,22 @@ struct GridPos {
     bool operator==(const GridPos&) const = default;
 };
 
-enum class TileType : uint8_t {
-    Grass,
-    Path,
-    Blocked,
-    Spawn,
-    Exit,
-    Buildable
-};
+enum class TileType : uint8_t { Grass, Path, Blocked, Spawn, Exit, Buildable };
 
-enum class TowerType : uint8_t {
-    Arrow,
-    Cannon,
-    Ice,
-    Lightning,
-    Poison,
-    Laser
-};
+enum class TowerType : uint8_t { Arrow, Cannon, Ice, Lightning, Poison, Laser };
 
-enum class EnemyType : uint8_t {
-    Grunt,
-    Runner,
-    Tank,
-    Healer,
-    Flying,
-    Boss
-};
+enum class EnemyType : uint8_t { Grunt, Runner, Tank, Healer, Flying, Boss };
 
-enum class EffectType : uint8_t {
-    None,
-    Slow,
-    Poison,
-    Burn,
-    Stun
-};
+enum class EffectType : uint8_t { None, Slow, Poison, Burn, Stun };
 
-enum class DamageType : uint8_t {
-    Physical,
-    Magic,
-    True
-};
+enum class DamageType : uint8_t { Physical, Magic, True };
 
-enum class AbilityId : uint8_t {
-    Fireball,
-    HealAura,
-    LightningStrike
-};
+enum class AbilityId : uint8_t { Fireball, HealAura, LightningStrike };
 
-enum class GameStateId : uint8_t {
-    Menu,
-    MapSelect,
-    Playing,
-    Paused,
-    GameOver,
-    Victory,
-    Upgrades
-};
+enum class GameStateId : uint8_t { Menu, MapSelect, Playing, Paused, GameOver, Victory, Upgrades };
 
-enum class Difficulty : uint8_t {
-    Easy,
-    Normal,
-    Hard
-};
+enum class Difficulty : uint8_t { Easy, Normal, Hard };
 
-enum class AbilityType : uint8_t {
-    SpeedBurst,
-    SpawnMinions,
-    DamageAura
-};
+enum class AbilityType : uint8_t { SpeedBurst, SpawnMinions, DamageAura };
 
 } // namespace ls

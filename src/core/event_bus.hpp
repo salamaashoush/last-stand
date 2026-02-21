@@ -1,6 +1,6 @@
 #pragma once
-#include <entt/entt.hpp>
 #include "types.hpp"
+#include <entt/entt.hpp>
 
 namespace ls {
 

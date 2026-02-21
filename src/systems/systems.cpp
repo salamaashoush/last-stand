@@ -1,12 +1,12 @@
 #include "systems.hpp"
-#include "core/game.hpp"
+#include "components/components.hpp"
 #include "core/asset_paths.hpp"
 #include "core/biome_theme.hpp"
-#include "components/components.hpp"
+#include "core/game.hpp"
 #include "factory/enemy_factory.hpp"
+#include "factory/hero_factory.hpp"
 #include "factory/projectile_factory.hpp"
 #include "factory/tower_factory.hpp"
-#include "factory/hero_factory.hpp"
 #include <algorithm>
 #include <cmath>
 #include <format>
@@ -106,9 +106,8 @@ void hero_system(Game& game, float dt) {
                 hero.attack_cooldown = std::max(0.1f, HERO_ATTACK_COOLDOWN - game.upgrades.bonus_cooldown());
 
                 // Fire a visible projectile at the enemy
-                auto proj_e = create_projectile(reg, tf.position, nearest, etf.position,
-                    dmg, DamageType::Physical, 400.0f,
-                    0, EffectType::None, 0.0f, 0, {100, 200, 255, 255});
+                auto proj_e = create_projectile(reg, tf.position, nearest, etf.position, dmg, DamageType::Physical,
+                                                400.0f, 0, EffectType::None, 0.0f, 0, {100, 200, 255, 255});
 
                 // Set projectile sprite
                 if (reg.valid(proj_e) && reg.all_of<Sprite>(proj_e)) {
@@ -145,10 +144,9 @@ void hero_system(Game& game, float dt) {
                     for (int i = 0; i < 5; ++i) {
                         float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
                         float spd = static_cast<float>(GetRandomValue(30, 80));
-                        create_particle(reg, etf.position,
-                            {std::cos(angle) * spd, std::sin(angle) * spd},
-                            {255, static_cast<unsigned char>(GetRandomValue(50, 200)), 0, 255},
-                            6.0f, 0.5f, assets::PART_FLAME);
+                        create_particle(reg, etf.position, {std::cos(angle) * spd, std::sin(angle) * spd},
+                                        {255, static_cast<unsigned char>(GetRandomValue(50, 200)), 0, 255}, 6.0f, 0.5f,
+                                        assets::PART_FLAME);
                     }
                 }
             }
@@ -164,9 +162,8 @@ void hero_system(Game& game, float dt) {
             for (int i = 0; i < 8; ++i) {
                 float angle = static_cast<float>(i) / 8.0f * 2.0f * PI;
                 float spd = 50.0f;
-                create_particle(reg, tf.position,
-                    {std::cos(angle) * spd, std::sin(angle) * spd},
-                    GREEN, 5.0f, 0.8f, assets::PART_MAGIC);
+                create_particle(reg, tf.position, {std::cos(angle) * spd, std::sin(angle) * spd}, GREEN, 5.0f, 0.8f,
+                                assets::PART_MAGIC);
             }
         }
 
@@ -190,10 +187,9 @@ void hero_system(Game& game, float dt) {
             for (int i = 0; i < 12; ++i) {
                 float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
                 float spd = static_cast<float>(GetRandomValue(40, 100));
-                create_particle(reg, target,
-                    {std::cos(angle) * spd, std::sin(angle) * spd},
-                    {255, 255, static_cast<unsigned char>(GetRandomValue(100, 255)), 255},
-                    4.0f, 0.4f, assets::PART_SPARK);
+                create_particle(reg, target, {std::cos(angle) * spd, std::sin(angle) * spd},
+                                {255, 255, static_cast<unsigned char>(GetRandomValue(100, 255)), 255}, 4.0f, 0.4f,
+                                assets::PART_SPARK);
             }
         }
 
@@ -266,12 +262,13 @@ void enemy_spawn_system(Game& game, float dt) {
         float scaling = game.wave_manager.scaling(ps.current_wave);
 
         // Apply difficulty scaling
-        if (game.difficulty == Difficulty::Easy) scaling *= 0.8f;
-        else if (game.difficulty == Difficulty::Hard) scaling *= 1.3f;
+        if (game.difficulty == Difficulty::Easy)
+            scaling *= 0.8f;
+        else if (game.difficulty == Difficulty::Hard)
+            scaling *= 1.3f;
 
         // Flying enemies use flying_path (shortcut)
-        auto& path = (entry.type == EnemyType::Flying && !ps.flying_path.empty())
-            ? ps.flying_path : ps.enemy_path;
+        auto& path = (entry.type == EnemyType::Flying && !ps.flying_path.empty()) ? ps.flying_path : ps.enemy_path;
 
         if (!path.empty()) {
             create_enemy(game.registry, entry.type, path, scaling, ps.current_wave);
@@ -385,7 +382,8 @@ void tower_attack_system(Game& game, float dt) {
                 game.dispatcher.trigger(DamageDealtEvent{tower.target, actual, target_tf.position});
                 // Apply burn effect
                 if (tower.effect != EffectType::None) {
-                    reg.emplace_or_replace<Effect>(tower.target, tower.effect, tower.effect_duration, 0.0f, 0.5f, 8, 1.0f);
+                    reg.emplace_or_replace<Effect>(tower.target, tower.effect, tower.effect_duration, 0.0f, 0.5f, 8,
+                                                   1.0f);
                 }
             }
         } else {
@@ -395,48 +393,59 @@ void tower_attack_system(Game& game, float dt) {
 
             // Play tower-specific fire sound
             switch (tower.type) {
-                case TowerType::Arrow:
-                    proj_color = {200, 150, 50, 255};
-                    game.sounds.play(game.sounds.arrow_fire);
-                    break;
-                case TowerType::Cannon:
-                    proj_color = {80, 80, 80, 255};
-                    dtype = DamageType::Physical;
-                    game.sounds.play(game.sounds.cannon_fire);
-                    break;
-                case TowerType::Ice:
-                    proj_color = {100, 200, 255, 255};
-                    dtype = DamageType::Magic;
-                    game.sounds.play(game.sounds.ice_fire);
-                    break;
-                case TowerType::Lightning:
-                    proj_color = {255, 255, 100, 255};
-                    dtype = DamageType::Magic;
-                    game.sounds.play(game.sounds.lightning_fire);
-                    break;
-                case TowerType::Poison:
-                    proj_color = {100, 200, 50, 255};
-                    dtype = DamageType::Magic;
-                    game.sounds.play(game.sounds.poison_fire);
-                    break;
-                default: break;
+            case TowerType::Arrow:
+                proj_color = {200, 150, 50, 255};
+                game.sounds.play(game.sounds.arrow_fire);
+                break;
+            case TowerType::Cannon:
+                proj_color = {80, 80, 80, 255};
+                dtype = DamageType::Physical;
+                game.sounds.play(game.sounds.cannon_fire);
+                break;
+            case TowerType::Ice:
+                proj_color = {100, 200, 255, 255};
+                dtype = DamageType::Magic;
+                game.sounds.play(game.sounds.ice_fire);
+                break;
+            case TowerType::Lightning:
+                proj_color = {255, 255, 100, 255};
+                dtype = DamageType::Magic;
+                game.sounds.play(game.sounds.lightning_fire);
+                break;
+            case TowerType::Poison:
+                proj_color = {100, 200, 50, 255};
+                dtype = DamageType::Magic;
+                game.sounds.play(game.sounds.poison_fire);
+                break;
+            default:
+                break;
             }
 
-            auto proj_e = create_projectile(reg, tf.position, tower.target, target_tf.position,
-                tower.damage, dtype, PROJECTILE_SPEED,
-                tower.aoe_radius, tower.effect, tower.effect_duration,
-                tower.chain_count, proj_color);
+            auto proj_e = create_projectile(reg, tf.position, tower.target, target_tf.position, tower.damage, dtype,
+                                            PROJECTILE_SPEED, tower.aoe_radius, tower.effect, tower.effect_duration,
+                                            tower.chain_count, proj_color);
 
             // Set projectile texture name
             if (reg.valid(proj_e) && reg.all_of<Sprite>(proj_e)) {
                 auto& proj_spr = reg.get<Sprite>(proj_e);
                 switch (tower.type) {
-                    case TowerType::Arrow:     proj_spr.texture_name = assets::PROJ_ARROW;     break;
-                    case TowerType::Cannon:    proj_spr.texture_name = assets::PROJ_CANNON;    break;
-                    case TowerType::Ice:       proj_spr.texture_name = assets::PROJ_ICE;       break;
-                    case TowerType::Lightning: proj_spr.texture_name = assets::PROJ_LIGHTNING; break;
-                    case TowerType::Poison:    proj_spr.texture_name = assets::PROJ_POISON;    break;
-                    default: break;
+                case TowerType::Arrow:
+                    proj_spr.texture_name = assets::PROJ_ARROW;
+                    break;
+                case TowerType::Cannon:
+                    proj_spr.texture_name = assets::PROJ_CANNON;
+                    break;
+                case TowerType::Ice:
+                    proj_spr.texture_name = assets::PROJ_ICE;
+                    break;
+                case TowerType::Lightning:
+                    proj_spr.texture_name = assets::PROJ_LIGHTNING;
+                    break;
+                case TowerType::Poison:
+                    proj_spr.texture_name = assets::PROJ_POISON;
+                    break;
+                default:
+                    break;
                 }
                 // Make projectile sprites a bit bigger for visibility
                 proj_spr.width = 12.0f;
@@ -484,7 +493,8 @@ void projectile_system(Game& game, [[maybe_unused]] float dt) {
                         ehp.current -= actual;
                         create_floating_text(reg, etf.position, std::to_string(actual), RED);
                         if (proj.effect != EffectType::None) {
-                            reg.emplace_or_replace<Effect>(ee, proj.effect, proj.effect_duration, 0.0f, 0.5f,
+                            reg.emplace_or_replace<Effect>(
+                                ee, proj.effect, proj.effect_duration, 0.0f, 0.5f,
                                 proj.effect == EffectType::Poison ? 5 : (proj.effect == EffectType::Burn ? 8 : 0),
                                 proj.effect == EffectType::Slow ? 0.5f : 1.0f);
                         }
@@ -494,9 +504,8 @@ void projectile_system(Game& game, [[maybe_unused]] float dt) {
                 for (int i = 0; i < 8; ++i) {
                     float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
                     float spd = static_cast<float>(GetRandomValue(30, 80));
-                    create_particle(reg, tf.position,
-                        {std::cos(angle) * spd, std::sin(angle) * spd},
-                        proj.trail_color, 5.0f, 0.4f, assets::PART_FLAME);
+                    create_particle(reg, tf.position, {std::cos(angle) * spd, std::sin(angle) * spd}, proj.trail_color,
+                                    5.0f, 0.4f, assets::PART_FLAME);
                 }
                 // Screen shake for AoE
                 game.play.shake_intensity = 3.0f;
@@ -512,7 +521,8 @@ void projectile_system(Game& game, [[maybe_unused]] float dt) {
                     create_floating_text(reg, etf.position, std::to_string(actual), RED);
 
                     if (proj.effect != EffectType::None) {
-                        reg.emplace_or_replace<Effect>(proj.target, proj.effect, proj.effect_duration, 0.0f, 0.5f,
+                        reg.emplace_or_replace<Effect>(
+                            proj.target, proj.effect, proj.effect_duration, 0.0f, 0.5f,
                             proj.effect == EffectType::Poison ? 5 : (proj.effect == EffectType::Burn ? 8 : 0),
                             proj.effect == EffectType::Slow ? 0.5f : 1.0f);
                     }
@@ -534,10 +544,9 @@ void projectile_system(Game& game, [[maybe_unused]] float dt) {
                     }
                     if (chain_target != entt::null) {
                         auto& ctf = reg.get<Transform>(chain_target);
-                        create_projectile(reg, tf.position, chain_target, ctf.position,
-                            proj.damage * 3 / 4, proj.damage_type, proj.speed * 1.5f,
-                            0, proj.effect, proj.effect_duration,
-                            proj.chain_count - 1, proj.trail_color);
+                        create_projectile(reg, tf.position, chain_target, ctf.position, proj.damage * 3 / 4,
+                                          proj.damage_type, proj.speed * 1.5f, 0, proj.effect, proj.effect_duration,
+                                          proj.chain_count - 1, proj.trail_color);
                     }
                 }
                 game.sounds.play(game.sounds.enemy_hit, 0.5f);
@@ -569,8 +578,7 @@ void aura_system(Game& game, float dt) {
             for (auto [ae, an, atf, ahp] : allies.each()) {
                 if (ae == e || reg.all_of<Dead>(ae)) continue;
                 if (tf.position.distance_to(atf.position) <= aura.radius) {
-                    ahp.current = std::min(ahp.max,
-                        ahp.current + static_cast<int>(aura.heal_per_sec * dt));
+                    ahp.current = std::min(ahp.max, ahp.current + static_cast<int>(aura.heal_per_sec * dt));
                 }
             }
         }
@@ -641,13 +649,11 @@ void health_system(Game& game, [[maybe_unused]] float dt) {
                 for (int i = 0; i < count; ++i) {
                     float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
                     float spd = static_cast<float>(GetRandomValue(40, 120));
-                    create_particle(reg, tf.position,
-                        {std::cos(angle) * spd, std::sin(angle) * spd},
-                        spr.color, (en.type == EnemyType::Boss) ? 6.0f : 4.0f, 0.6f, assets::PART_SMOKE);
+                    create_particle(reg, tf.position, {std::cos(angle) * spd, std::sin(angle) * spd}, spr.color,
+                                    (en.type == EnemyType::Boss) ? 6.0f : 4.0f, 0.6f, assets::PART_SMOKE);
                 }
                 // Gold text
-                create_floating_text(reg, tf.position,
-                    "+" + std::to_string(en.reward) + "g", GOLD);
+                create_floating_text(reg, tf.position, "+" + std::to_string(en.reward) + "g", GOLD);
 
                 // Sounds and shake for deaths
                 if (en.type == EnemyType::Boss) {
@@ -666,8 +672,7 @@ void health_system(Game& game, [[maybe_unused]] float dt) {
 // ============================================================
 // 12. Economy System
 // ============================================================
-void economy_system([[maybe_unused]] Game& game, [[maybe_unused]] float dt) {
-}
+void economy_system([[maybe_unused]] Game& game, [[maybe_unused]] float dt) {}
 
 // ============================================================
 // 13. Collision System - Enemies reaching exit
@@ -757,48 +762,47 @@ void boss_system(Game& game, float dt) {
             boss.ability_timer = boss.ability_cooldown;
 
             switch (boss.boss_ability) {
-                case AbilityType::SpeedBurst: {
-                    boss.ability_active = true;
-                    boss.ability_duration = 2.0f;
-                    if (reg.all_of<PathFollower>(e)) {
-                        auto& pf = reg.get<PathFollower>(e);
-                        pf.speed = pf.base_speed * 2.5f;
-                    }
-                    create_floating_text(reg, tf.position, "SPEED!", RED);
-                    // Red particles
-                    for (int i = 0; i < 6; ++i) {
-                        float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
-                        create_particle(reg, tf.position,
-                            {std::cos(angle) * 40.0f, std::sin(angle) * 40.0f},
-                            RED, 4.0f, 0.5f, assets::PART_FLAME);
-                    }
-                    break;
+            case AbilityType::SpeedBurst: {
+                boss.ability_active = true;
+                boss.ability_duration = 2.0f;
+                if (reg.all_of<PathFollower>(e)) {
+                    auto& pf = reg.get<PathFollower>(e);
+                    pf.speed = pf.base_speed * 2.5f;
                 }
-                case AbilityType::SpawnMinions: {
-                    create_floating_text(reg, tf.position, "SUMMON!", {255, 200, 50, 255});
-                    float scaling = game.wave_manager.scaling(game.play.current_wave);
-                    for (int i = 0; i < 3; ++i) {
-                        // Create minions at boss position - need a small path from boss to exit
-                        auto& pf = reg.get<PathFollower>(e);
-                        std::vector<Vec2> minion_path;
-                        minion_path.push_back(tf.position);
-                        // Add remaining waypoints from boss's current path
-                        for (size_t pi = pf.current_index; pi < pf.path.size(); ++pi) {
-                            minion_path.push_back(pf.path[pi]);
-                        }
-                        if (minion_path.size() > 1) {
-                            create_enemy(reg, EnemyType::Grunt, minion_path, scaling * 0.5f);
-                            game.play.enemies_alive++;
-                        }
+                create_floating_text(reg, tf.position, "SPEED!", RED);
+                // Red particles
+                for (int i = 0; i < 6; ++i) {
+                    float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
+                    create_particle(reg, tf.position, {std::cos(angle) * 40.0f, std::sin(angle) * 40.0f}, RED, 4.0f,
+                                    0.5f, assets::PART_FLAME);
+                }
+                break;
+            }
+            case AbilityType::SpawnMinions: {
+                create_floating_text(reg, tf.position, "SUMMON!", {255, 200, 50, 255});
+                float scaling = game.wave_manager.scaling(game.play.current_wave);
+                for (int i = 0; i < 3; ++i) {
+                    // Create minions at boss position - need a small path from boss to exit
+                    auto& pf = reg.get<PathFollower>(e);
+                    std::vector<Vec2> minion_path;
+                    minion_path.push_back(tf.position);
+                    // Add remaining waypoints from boss's current path
+                    for (size_t pi = pf.current_index; pi < pf.path.size(); ++pi) {
+                        minion_path.push_back(pf.path[pi]);
                     }
-                    break;
+                    if (minion_path.size() > 1) {
+                        create_enemy(reg, EnemyType::Grunt, minion_path, scaling * 0.5f);
+                        game.play.enemies_alive++;
+                    }
                 }
-                case AbilityType::DamageAura: {
-                    boss.ability_active = true;
-                    boss.ability_duration = 3.0f;
-                    create_floating_text(reg, tf.position, "AURA!", {255, 50, 50, 255});
-                    break;
-                }
+                break;
+            }
+            case AbilityType::DamageAura: {
+                boss.ability_active = true;
+                boss.ability_duration = 3.0f;
+                create_floating_text(reg, tf.position, "AURA!", {255, 50, 50, 255});
+                break;
+            }
             }
         }
     }
@@ -828,9 +832,8 @@ void enemy_combat_system(Game& game, float dt) {
                 create_floating_text(reg, htf.position, "-" + std::to_string(actual), RED);
                 // Hit particles
                 float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
-                create_particle(reg, htf.position,
-                    {std::cos(angle) * 30.0f, std::sin(angle) * 30.0f},
-                    RED, 3.0f, 0.2f, assets::PART_SPARK);
+                create_particle(reg, htf.position, {std::cos(angle) * 30.0f, std::sin(angle) * 30.0f}, RED, 3.0f, 0.2f,
+                                assets::PART_SPARK);
                 break; // Only attack one target per tick
             }
         }
@@ -858,7 +861,8 @@ void enemy_combat_system(Game& game, float dt) {
                 en.attack_timer = en.attack_cooldown;
                 create_floating_text(reg, ttf.position, "-" + std::to_string(actual), {255, 100, 100, 255});
                 // Spark
-                create_particle(reg, ttf.position,
+                create_particle(
+                    reg, ttf.position,
                     {static_cast<float>(GetRandomValue(-30, 30)), static_cast<float>(GetRandomValue(-30, 30))},
                     {255, 200, 50, 255}, 3.0f, 0.3f);
             }
@@ -923,8 +927,10 @@ void body_collision_system(Game& game, [[maybe_unused]] float dt) {
                     float along = push_dir.x * avg_dir.x + push_dir.y * avg_dir.y;
                     push_dir.x -= along * avg_dir.x;
                     push_dir.y -= along * avg_dir.y;
-                    if (push_dir.length() > 0.01f) push_dir = push_dir.normalized();
-                    else push_dir = diff.normalized();
+                    if (push_dir.length() > 0.01f)
+                        push_dir = push_dir.normalized();
+                    else
+                        push_dir = diff.normalized();
                 }
                 Vec2 push = push_dir * ((min_dist - dist) * 0.15f);
                 tf1.position = tf1.position + push;
@@ -951,9 +957,8 @@ void tower_health_system(Game& game, [[maybe_unused]] float dt) {
             for (int i = 0; i < 10; ++i) {
                 float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
                 float spd = static_cast<float>(GetRandomValue(30, 80));
-                create_particle(reg, tf.position,
-                    {std::cos(angle) * spd, std::sin(angle) * spd},
-                    spr.color, 5.0f, 0.5f, assets::PART_SMOKE);
+                create_particle(reg, tf.position, {std::cos(angle) * spd, std::sin(angle) * spd}, spr.color, 5.0f, 0.5f,
+                                assets::PART_SMOKE);
             }
             create_floating_text(reg, tf.position, "DESTROYED!", RED);
             game.play.shake_intensity = 4.0f;
@@ -1047,8 +1052,8 @@ void coin_system(Game& game, float dt) {
                 auto& coin = reg.get<Coin>(ce);
                 game.play.gold += coin.value;
                 game.play.stats.gold_earned += coin.value;
-                create_floating_text(reg, reg.get<Transform>(ce).position,
-                    "+" + std::to_string(coin.value) + "g", GOLD);
+                create_floating_text(reg, reg.get<Transform>(ce).position, "+" + std::to_string(coin.value) + "g",
+                                     GOLD);
                 game.sounds.play(game.sounds.ui_click, 0.6f);
                 reg.destroy(ce);
             }
@@ -1077,12 +1082,36 @@ void render_system(Game& game) {
             Color fallback;
             Color tint = WHITE;
             switch (tile) {
-                case TileType::Grass:    tex_name = theme.ground_tex;      fallback = theme.ground_fallback;  tint = theme.ground_tint; break;
-                case TileType::Buildable:tex_name = assets::TILE_BUILDABLE;fallback = theme.ground_fallback;  tint = theme.marker_tint; break;
-                case TileType::Path:     tex_name = theme.path_tex;        fallback = theme.path_fallback;    tint = theme.path_tint; break;
-                case TileType::Spawn:    tex_name = assets::TILE_SPAWN;    fallback = theme.ground_fallback;  tint = theme.marker_tint; break;
-                case TileType::Exit:     tex_name = assets::TILE_EXIT;     fallback = theme.ground_fallback;  tint = theme.marker_tint; break;
-                case TileType::Blocked:  tex_name = theme.blocked_tex;     fallback = theme.blocked_fallback; tint = theme.blocked_tint; break;
+            case TileType::Grass:
+                tex_name = theme.ground_tex;
+                fallback = theme.ground_fallback;
+                tint = theme.ground_tint;
+                break;
+            case TileType::Buildable:
+                tex_name = assets::TILE_BUILDABLE;
+                fallback = theme.ground_fallback;
+                tint = theme.marker_tint;
+                break;
+            case TileType::Path:
+                tex_name = theme.path_tex;
+                fallback = theme.path_fallback;
+                tint = theme.path_tint;
+                break;
+            case TileType::Spawn:
+                tex_name = assets::TILE_SPAWN;
+                fallback = theme.ground_fallback;
+                tint = theme.marker_tint;
+                break;
+            case TileType::Exit:
+                tex_name = assets::TILE_EXIT;
+                fallback = theme.ground_fallback;
+                tint = theme.marker_tint;
+                break;
+            case TileType::Blocked:
+                tex_name = theme.blocked_tex;
+                fallback = theme.blocked_fallback;
+                tint = theme.blocked_tint;
+                break;
             }
             float dx = static_cast<float>(GRID_OFFSET_X + x * TILE_SIZE) + TILE_SIZE / 2.0f;
             float dy = static_cast<float>(GRID_OFFSET_Y + y * TILE_SIZE) + TILE_SIZE / 2.0f;
@@ -1103,19 +1132,17 @@ void render_system(Game& game) {
                 }
                 draw_tex(tex, dx, dy, ts, ts, 0, draw_tint);
             } else {
-                DrawRectangle(GRID_OFFSET_X + x * TILE_SIZE, GRID_OFFSET_Y + y * TILE_SIZE,
-                             TILE_SIZE - 1, TILE_SIZE - 1, fallback);
+                DrawRectangle(GRID_OFFSET_X + x * TILE_SIZE, GRID_OFFSET_Y + y * TILE_SIZE, TILE_SIZE - 1,
+                              TILE_SIZE - 1, fallback);
             }
         }
     }
 
     // Draw decorations
     {
-        const char* deco_names[] = {
-            assets::DECO_TREE_BIG, assets::DECO_BUSH, assets::DECO_LEAF,
-            assets::DECO_FLOWER, assets::DECO_ROCK_SM, assets::DECO_ROCK_MD, assets::DECO_ROCK_LG,
-            assets::DECO_FLAME
-        };
+        const char* deco_names[] = {assets::DECO_TREE_BIG, assets::DECO_BUSH,    assets::DECO_LEAF,
+                                    assets::DECO_FLOWER,   assets::DECO_ROCK_SM, assets::DECO_ROCK_MD,
+                                    assets::DECO_ROCK_LG,  assets::DECO_FLAME};
         for (auto& deco : map.decorations) {
             float dx = static_cast<float>(GRID_OFFSET_X + deco.pos.x * TILE_SIZE) + TILE_SIZE / 2.0f;
             float dy = static_cast<float>(GRID_OFFSET_Y + deco.pos.y * TILE_SIZE) + TILE_SIZE / 2.0f;
@@ -1143,34 +1170,45 @@ void render_system(Game& game) {
 
             // Pulsing semi-transparent border
             float pulse_alpha = 0.4f + 0.3f * std::sin(static_cast<float>(GetTime()) * 4.0f);
-            Color border_color = valid
-                ? Color{0, 255, 0, static_cast<unsigned char>(255 * pulse_alpha)}
-                : Color{255, 0, 0, static_cast<unsigned char>(255 * pulse_alpha)};
+            Color border_color = valid ? Color{0, 255, 0, static_cast<unsigned char>(255 * pulse_alpha)}
+                                       : Color{255, 0, 0, static_cast<unsigned char>(255 * pulse_alpha)};
             DrawRectangleLinesEx({tx, ty, ts, ts}, 2.0f, border_color);
 
             // Tower weapon preview at 50% alpha when valid
             if (valid) {
                 const char* weapon_tex_name = nullptr;
                 switch (*game.play.placing_tower) {
-                    case TowerType::Arrow:     weapon_tex_name = assets::TOWER_ARROW; break;
-                    case TowerType::Cannon:    weapon_tex_name = assets::TOWER_CANNON; break;
-                    case TowerType::Ice:       weapon_tex_name = assets::TOWER_ICE; break;
-                    case TowerType::Lightning: weapon_tex_name = assets::TOWER_LIGHTNING; break;
-                    case TowerType::Poison:    weapon_tex_name = assets::TOWER_POISON; break;
-                    case TowerType::Laser:     weapon_tex_name = assets::TOWER_LASER; break;
+                case TowerType::Arrow:
+                    weapon_tex_name = assets::TOWER_ARROW;
+                    break;
+                case TowerType::Cannon:
+                    weapon_tex_name = assets::TOWER_CANNON;
+                    break;
+                case TowerType::Ice:
+                    weapon_tex_name = assets::TOWER_ICE;
+                    break;
+                case TowerType::Lightning:
+                    weapon_tex_name = assets::TOWER_LIGHTNING;
+                    break;
+                case TowerType::Poison:
+                    weapon_tex_name = assets::TOWER_POISON;
+                    break;
+                case TowerType::Laser:
+                    weapon_tex_name = assets::TOWER_LASER;
+                    break;
                 }
                 if (weapon_tex_name) {
                     Texture2D* weapon_tex = game.assets.get_texture(weapon_tex_name);
                     if (weapon_tex) {
-                        draw_tex(weapon_tex, tx + ts / 2.0f, ty + ts / 2.0f, ts * 0.7f, ts * 0.7f, 0, {255, 255, 255, 128});
+                        draw_tex(weapon_tex, tx + ts / 2.0f, ty + ts / 2.0f, ts * 0.7f, ts * 0.7f, 0,
+                                 {255, 255, 255, 128});
                     }
                 }
 
                 // Range indicator
                 auto& stats = game.tower_registry.get(*game.play.placing_tower, 1);
                 auto world = map.grid_to_world(gp);
-                DrawCircleLines(static_cast<int>(world.x), static_cast<int>(world.y),
-                               stats.range, {255, 255, 255, 80});
+                DrawCircleLines(static_cast<int>(world.x), static_cast<int>(world.y), stats.range, {255, 255, 255, 80});
             }
         }
     }
@@ -1179,17 +1217,16 @@ void render_system(Game& game) {
     if (game.play.selected_tower != entt::null && reg.valid(game.play.selected_tower)) {
         auto& tower = reg.get<Tower>(game.play.selected_tower);
         auto& tf = reg.get<Transform>(game.play.selected_tower);
-        DrawCircleLines(static_cast<int>(tf.position.x), static_cast<int>(tf.position.y),
-                       tower.range, {255, 255, 255, 100});
+        DrawCircleLines(static_cast<int>(tf.position.x), static_cast<int>(tf.position.y), tower.range,
+                        {255, 255, 255, 100});
     }
 
     // Enhanced Laser beams (3-layer beam)
     {
         auto view = reg.view<Tower, Transform>();
         for (auto [e, tower, tf] : view.each()) {
-            if (tower.type == TowerType::Laser && tower.target != entt::null
-                && reg.valid(tower.target) && reg.all_of<Transform>(tower.target)
-                && !reg.all_of<Dead>(tower.target)) {
+            if (tower.type == TowerType::Laser && tower.target != entt::null && reg.valid(tower.target) &&
+                reg.all_of<Transform>(tower.target) && !reg.all_of<Dead>(tower.target)) {
                 auto& etf = reg.get<Transform>(tower.target);
                 // 3-layer beam: thick dark, medium red, thin white core
                 DrawLineEx(tf.position.to_raylib(), etf.position.to_raylib(), 6.0f, {100, 0, 0, 150});
@@ -1199,9 +1236,8 @@ void render_system(Game& game) {
                 if (GetRandomValue(0, 2) == 0) {
                     float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
                     float spd = static_cast<float>(GetRandomValue(20, 50));
-                    create_particle(reg, etf.position,
-                        {std::cos(angle) * spd, std::sin(angle) * spd},
-                        {255, 200, 100, 255}, 3.0f, 0.2f, assets::PART_SPARK);
+                    create_particle(reg, etf.position, {std::cos(angle) * spd, std::sin(angle) * spd},
+                                    {255, 200, 100, 255}, 3.0f, 0.2f, assets::PART_SPARK);
                 }
             }
         }
@@ -1238,22 +1274,38 @@ void render_system(Game& game) {
             // Display size for textures - large enough to be clearly visible
             float display_size;
             switch (en.type) {
-                case EnemyType::Runner: display_size = 38.0f; break;
-                case EnemyType::Grunt:  display_size = 40.0f; break;
-                case EnemyType::Healer: display_size = 38.0f; break;
-                case EnemyType::Flying: display_size = 38.0f; break;
-                case EnemyType::Tank:   display_size = 46.0f; break;
-                case EnemyType::Boss:   display_size = 54.0f; break;
+            case EnemyType::Runner:
+                display_size = 38.0f;
+                break;
+            case EnemyType::Grunt:
+                display_size = 40.0f;
+                break;
+            case EnemyType::Healer:
+                display_size = 38.0f;
+                break;
+            case EnemyType::Flying:
+                display_size = 38.0f;
+                break;
+            case EnemyType::Tank:
+                display_size = 46.0f;
+                break;
+            case EnemyType::Boss:
+                display_size = 54.0f;
+                break;
             }
 
             // Effect visuals (tint)
             Color tint = WHITE;
             if (reg.all_of<Effect>(e)) {
                 auto& eff = reg.get<Effect>(e);
-                if (eff.type == EffectType::Slow) tint = {100, 200, 255, 255};
-                else if (eff.type == EffectType::Poison) tint = {100, 200, 50, 255};
-                else if (eff.type == EffectType::Burn) tint = {255, 150, 50, 255};
-                else if (eff.type == EffectType::Stun) tint = {200, 200, 200, 255};
+                if (eff.type == EffectType::Slow)
+                    tint = {100, 200, 255, 255};
+                else if (eff.type == EffectType::Poison)
+                    tint = {100, 200, 50, 255};
+                else if (eff.type == EffectType::Burn)
+                    tint = {255, 150, 50, 255};
+                else if (eff.type == EffectType::Stun)
+                    tint = {200, 200, 200, 255};
             }
 
             // Compute rotation from velocity direction
@@ -1271,12 +1323,24 @@ void render_system(Game& game) {
             // Get enemy texture
             const char* tex_name = nullptr;
             switch (en.type) {
-                case EnemyType::Grunt:  tex_name = assets::ENEMY_GRUNT;  break;
-                case EnemyType::Runner: tex_name = assets::ENEMY_RUNNER; break;
-                case EnemyType::Tank:   tex_name = assets::ENEMY_TANK;   break;
-                case EnemyType::Healer: tex_name = assets::ENEMY_HEALER; break;
-                case EnemyType::Flying: tex_name = assets::ENEMY_FLYING; break;
-                case EnemyType::Boss:   tex_name = assets::ENEMY_BOSS;   break;
+            case EnemyType::Grunt:
+                tex_name = assets::ENEMY_GRUNT;
+                break;
+            case EnemyType::Runner:
+                tex_name = assets::ENEMY_RUNNER;
+                break;
+            case EnemyType::Tank:
+                tex_name = assets::ENEMY_TANK;
+                break;
+            case EnemyType::Healer:
+                tex_name = assets::ENEMY_HEALER;
+                break;
+            case EnemyType::Flying:
+                tex_name = assets::ENEMY_FLYING;
+                break;
+            case EnemyType::Boss:
+                tex_name = assets::ENEMY_BOSS;
+                break;
             }
 
             Texture2D* tex = tex_name ? game.assets.get_texture(tex_name) : nullptr;
@@ -1287,53 +1351,52 @@ void render_system(Game& game) {
                 Color c = spr.color;
                 if (tint.r != 255 || tint.g != 255 || tint.b != 255) c = tint; // use effect color
                 switch (en.type) {
-                    case EnemyType::Runner: {
-                        Vec2 dir = {1, 0};
-                        if (reg.all_of<Velocity>(e)) {
-                            auto& vel = reg.get<Velocity>(e);
-                            if (vel.vel.length() > 0.1f) dir = vel.vel.normalized();
-                        }
-                        Vec2 tip = tf.position + dir * hw;
-                        Vec2 perp = {-dir.y, dir.x};
-                        Vec2 left = tf.position - dir * (hw * 0.5f) + perp * (hh * 0.6f);
-                        Vec2 right = tf.position - dir * (hw * 0.5f) - perp * (hh * 0.6f);
-                        DrawTriangle(tip.to_raylib(), left.to_raylib(), right.to_raylib(), c);
-                        break;
+                case EnemyType::Runner: {
+                    Vec2 dir = {1, 0};
+                    if (reg.all_of<Velocity>(e)) {
+                        auto& vel = reg.get<Velocity>(e);
+                        if (vel.vel.length() > 0.1f) dir = vel.vel.normalized();
                     }
-                    case EnemyType::Tank: {
-                        DrawRectangle(static_cast<int>(tf.position.x - hw), static_cast<int>(tf.position.y - hh),
-                                     static_cast<int>(spr.width), static_cast<int>(spr.height), c);
-                        Color inner = {static_cast<unsigned char>(c.r * 0.6f), static_cast<unsigned char>(c.g * 0.6f),
-                                       static_cast<unsigned char>(c.b * 0.6f), 255};
-                        float pad = 4.0f;
-                        DrawRectangle(static_cast<int>(tf.position.x - hw + pad), static_cast<int>(tf.position.y - hh + pad),
-                                     static_cast<int>(spr.width - pad * 2), static_cast<int>(spr.height - pad * 2), inner);
-                        break;
-                    }
-                    case EnemyType::Healer: {
-                        DrawCircleV(tf.position.to_raylib(), hw, c);
-                        Color cross = {50, 255, 50, 255};
-                        float cs = hw * 0.5f;
-                        DrawLineEx({tf.position.x - cs, tf.position.y}, {tf.position.x + cs, tf.position.y}, 2.0f, cross);
-                        DrawLineEx({tf.position.x, tf.position.y - cs}, {tf.position.x, tf.position.y + cs}, 2.0f, cross);
-                        break;
-                    }
-                    case EnemyType::Flying: {
-                        Vector2 pts[] = {
-                            {tf.position.x, tf.position.y - hh},
-                            {tf.position.x + hw, tf.position.y},
-                            {tf.position.x, tf.position.y + hh},
-                            {tf.position.x - hw, tf.position.y}
-                        };
-                        DrawTriangle(pts[0], pts[2], pts[1], c);
-                        DrawTriangle(pts[0], pts[3], pts[2], c);
-                        break;
-                    }
-                    default: {
-                        DrawRectangle(static_cast<int>(tf.position.x - hw), static_cast<int>(tf.position.y - hh),
-                                     static_cast<int>(spr.width), static_cast<int>(spr.height), c);
-                        break;
-                    }
+                    Vec2 tip = tf.position + dir * hw;
+                    Vec2 perp = {-dir.y, dir.x};
+                    Vec2 left = tf.position - dir * (hw * 0.5f) + perp * (hh * 0.6f);
+                    Vec2 right = tf.position - dir * (hw * 0.5f) - perp * (hh * 0.6f);
+                    DrawTriangle(tip.to_raylib(), left.to_raylib(), right.to_raylib(), c);
+                    break;
+                }
+                case EnemyType::Tank: {
+                    DrawRectangle(static_cast<int>(tf.position.x - hw), static_cast<int>(tf.position.y - hh),
+                                  static_cast<int>(spr.width), static_cast<int>(spr.height), c);
+                    Color inner = {static_cast<unsigned char>(c.r * 0.6f), static_cast<unsigned char>(c.g * 0.6f),
+                                   static_cast<unsigned char>(c.b * 0.6f), 255};
+                    float pad = 4.0f;
+                    DrawRectangle(static_cast<int>(tf.position.x - hw + pad),
+                                  static_cast<int>(tf.position.y - hh + pad), static_cast<int>(spr.width - pad * 2),
+                                  static_cast<int>(spr.height - pad * 2), inner);
+                    break;
+                }
+                case EnemyType::Healer: {
+                    DrawCircleV(tf.position.to_raylib(), hw, c);
+                    Color cross = {50, 255, 50, 255};
+                    float cs = hw * 0.5f;
+                    DrawLineEx({tf.position.x - cs, tf.position.y}, {tf.position.x + cs, tf.position.y}, 2.0f, cross);
+                    DrawLineEx({tf.position.x, tf.position.y - cs}, {tf.position.x, tf.position.y + cs}, 2.0f, cross);
+                    break;
+                }
+                case EnemyType::Flying: {
+                    Vector2 pts[] = {{tf.position.x, tf.position.y - hh},
+                                     {tf.position.x + hw, tf.position.y},
+                                     {tf.position.x, tf.position.y + hh},
+                                     {tf.position.x - hw, tf.position.y}};
+                    DrawTriangle(pts[0], pts[2], pts[1], c);
+                    DrawTriangle(pts[0], pts[3], pts[2], c);
+                    break;
+                }
+                default: {
+                    DrawRectangle(static_cast<int>(tf.position.x - hw), static_cast<int>(tf.position.y - hh),
+                                  static_cast<int>(spr.width), static_cast<int>(spr.height), c);
+                    break;
+                }
                 }
             }
 
@@ -1350,7 +1413,7 @@ void render_system(Game& game) {
                         auto aura_alpha = static_cast<unsigned char>(40 + 40 * pulse);
                         DrawCircleV(tf.position.to_raylib(), 120.0f, {255, 0, 0, aura_alpha});
                         DrawCircleLines(static_cast<int>(tf.position.x), static_cast<int>(tf.position.y), 120.0f,
-                                       {255, 50, 50, static_cast<unsigned char>(100 + 100 * pulse)});
+                                        {255, 50, 50, static_cast<unsigned char>(100 + 100 * pulse)});
                     }
                 }
             }
@@ -1358,8 +1421,8 @@ void render_system(Game& game) {
             // Healer aura ring
             if (en.type == EnemyType::Healer && reg.all_of<Aura>(e)) {
                 auto& aura = reg.get<Aura>(e);
-                DrawCircleLines(static_cast<int>(tf.position.x), static_cast<int>(tf.position.y),
-                               aura.radius, {50, 255, 50, 60});
+                DrawCircleLines(static_cast<int>(tf.position.x), static_cast<int>(tf.position.y), aura.radius,
+                                {50, 255, 50, 60});
             }
 
             // Health bar - sized to match display_size
@@ -1369,10 +1432,9 @@ void render_system(Game& game) {
                     float bar_w = display_size;
                     float bx = tf.position.x - bar_w / 2;
                     float by = tf.position.y - display_size / 2 - 6;
-                    DrawRectangle(static_cast<int>(bx), static_cast<int>(by),
-                                 static_cast<int>(bar_w), 3, DARKGRAY);
-                    DrawRectangle(static_cast<int>(bx), static_cast<int>(by),
-                                 static_cast<int>(bar_w * hp.ratio()), 3, GREEN);
+                    DrawRectangle(static_cast<int>(bx), static_cast<int>(by), static_cast<int>(bar_w), 3, DARKGRAY);
+                    DrawRectangle(static_cast<int>(bx), static_cast<int>(by), static_cast<int>(bar_w * hp.ratio()), 3,
+                                  GREEN);
                 }
             }
         }
@@ -1410,18 +1472,36 @@ void render_system(Game& game) {
             // Get tower base and weapon textures
             const char* base_name = nullptr;
             switch (tower.level) {
-                case 1: base_name = assets::TOWER_BASE_L1; break;
-                case 2: base_name = assets::TOWER_BASE_L2; break;
-                default: base_name = assets::TOWER_BASE_L3; break;
+            case 1:
+                base_name = assets::TOWER_BASE_L1;
+                break;
+            case 2:
+                base_name = assets::TOWER_BASE_L2;
+                break;
+            default:
+                base_name = assets::TOWER_BASE_L3;
+                break;
             }
             const char* weapon_name = nullptr;
             switch (tower.type) {
-                case TowerType::Arrow:     weapon_name = assets::TOWER_ARROW;     break;
-                case TowerType::Cannon:    weapon_name = assets::TOWER_CANNON;    break;
-                case TowerType::Ice:       weapon_name = assets::TOWER_ICE;       break;
-                case TowerType::Lightning: weapon_name = assets::TOWER_LIGHTNING; break;
-                case TowerType::Poison:    weapon_name = assets::TOWER_POISON;    break;
-                case TowerType::Laser:     weapon_name = assets::TOWER_LASER;     break;
+            case TowerType::Arrow:
+                weapon_name = assets::TOWER_ARROW;
+                break;
+            case TowerType::Cannon:
+                weapon_name = assets::TOWER_CANNON;
+                break;
+            case TowerType::Ice:
+                weapon_name = assets::TOWER_ICE;
+                break;
+            case TowerType::Lightning:
+                weapon_name = assets::TOWER_LIGHTNING;
+                break;
+            case TowerType::Poison:
+                weapon_name = assets::TOWER_POISON;
+                break;
+            case TowerType::Laser:
+                weapon_name = assets::TOWER_LASER;
+                break;
             }
 
             Texture2D* base_tex = base_name ? game.assets.get_texture(base_name) : nullptr;
@@ -1449,33 +1529,33 @@ void render_system(Game& game) {
             } else {
                 // Procedural fallback
                 switch (tower.type) {
-                    case TowerType::Arrow: {
-                        Vector2 top = {tf.position.x, tf.position.y - hh};
-                        Vector2 bl = {tf.position.x - hw, tf.position.y + hh};
-                        Vector2 br = {tf.position.x + hw, tf.position.y + hh};
-                        DrawTriangle(top, bl, br, spr.color);
-                        break;
-                    }
-                    case TowerType::Cannon: {
-                        DrawCircleV(tf.position.to_raylib(), r, spr.color);
-                        DrawCircleV({tf.position.x, tf.position.y - r * 0.6f}, r * 0.3f, {50, 50, 50, 255});
-                        break;
-                    }
-                    case TowerType::Ice:
-                        DrawPoly(tf.position.to_raylib(), 6, r, 0, spr.color);
-                        break;
-                    case TowerType::Lightning:
-                        DrawPoly(tf.position.to_raylib(), 4, r, 45, spr.color);
-                        break;
-                    case TowerType::Poison: {
-                        DrawCircleV(tf.position.to_raylib(), r, spr.color);
-                        DrawLineEx({tf.position.x, tf.position.y + r},
-                                  {tf.position.x, tf.position.y + r + 6}, 3.0f, spr.color);
-                        break;
-                    }
-                    case TowerType::Laser:
-                        DrawPoly(tf.position.to_raylib(), 4, r, 0, spr.color);
-                        break;
+                case TowerType::Arrow: {
+                    Vector2 top = {tf.position.x, tf.position.y - hh};
+                    Vector2 bl = {tf.position.x - hw, tf.position.y + hh};
+                    Vector2 br = {tf.position.x + hw, tf.position.y + hh};
+                    DrawTriangle(top, bl, br, spr.color);
+                    break;
+                }
+                case TowerType::Cannon: {
+                    DrawCircleV(tf.position.to_raylib(), r, spr.color);
+                    DrawCircleV({tf.position.x, tf.position.y - r * 0.6f}, r * 0.3f, {50, 50, 50, 255});
+                    break;
+                }
+                case TowerType::Ice:
+                    DrawPoly(tf.position.to_raylib(), 6, r, 0, spr.color);
+                    break;
+                case TowerType::Lightning:
+                    DrawPoly(tf.position.to_raylib(), 4, r, 45, spr.color);
+                    break;
+                case TowerType::Poison: {
+                    DrawCircleV(tf.position.to_raylib(), r, spr.color);
+                    DrawLineEx({tf.position.x, tf.position.y + r}, {tf.position.x, tf.position.y + r + 6}, 3.0f,
+                               spr.color);
+                    break;
+                }
+                case TowerType::Laser:
+                    DrawPoly(tf.position.to_raylib(), 4, r, 0, spr.color);
+                    break;
                 }
             }
 
@@ -1490,15 +1570,13 @@ void render_system(Game& game) {
             // Tower level indicator
             if (tower.level > 1) {
                 for (int i = 0; i < tower.level - 1; ++i) {
-                    DrawCircleV({tf.position.x - 8.0f + i * 10.0f, tf.position.y + hh - 4},
-                               3, GOLD);
+                    DrawCircleV({tf.position.x - 8.0f + i * 10.0f, tf.position.y + hh - 4}, 3, GOLD);
                 }
             }
             // Selection highlight
             if (e == game.play.selected_tower) {
-                DrawRectangleLinesEx(
-                    {tf.position.x - hw - 2, tf.position.y - hh - 2, spr.width + 4, spr.height + 4},
-                    2, WHITE);
+                DrawRectangleLinesEx({tf.position.x - hw - 2, tf.position.y - hh - 2, spr.width + 4, spr.height + 4}, 2,
+                                     WHITE);
             }
 
             // Tower health bar
@@ -1510,8 +1588,8 @@ void render_system(Game& game) {
                     float by = tf.position.y - hh - 8;
                     DrawRectangle(static_cast<int>(bx), static_cast<int>(by), static_cast<int>(bw), 3, DARKGRAY);
                     Color hpc = hp.ratio() > 0.5f ? LIME : (hp.ratio() > 0.25f ? YELLOW : RED);
-                    DrawRectangle(static_cast<int>(bx), static_cast<int>(by),
-                                 static_cast<int>(bw * hp.ratio()), 3, hpc);
+                    DrawRectangle(static_cast<int>(bx), static_cast<int>(by), static_cast<int>(bw * hp.ratio()), 3,
+                                  hpc);
                 }
             }
         }
@@ -1534,8 +1612,7 @@ void render_system(Game& game) {
             }
             // Gold value text
             auto val_text = std::format("{}g", coin.value);
-            draw_text(game.assets, val_text.c_str(),
-                tf.position.x - 8, tf.position.y + bob_y - 14, 10, GOLD);
+            draw_text(game.assets, val_text.c_str(), tf.position.x - 8, tf.position.y + bob_y - 14, 10, GOLD);
         }
     }
 
@@ -1552,12 +1629,9 @@ void render_system(Game& game) {
                     // Extract the correct frame from spritesheet
                     int row = anim.anim_frames.empty() ? 0 : anim.anim_frames[anim.current_frame];
                     int col = anim.direction;
-                    Rectangle srcRect = {
-                        static_cast<float>(col * anim.frame_width),
-                        static_cast<float>(row * anim.frame_height),
-                        static_cast<float>(anim.frame_width),
-                        static_cast<float>(anim.frame_height)
-                    };
+                    Rectangle srcRect = {static_cast<float>(col * anim.frame_width),
+                                         static_cast<float>(row * anim.frame_height),
+                                         static_cast<float>(anim.frame_width), static_cast<float>(anim.frame_height)};
                     float ds = anim.display_size;
                     draw_tex_src(tex, srcRect, tf.position.x, tf.position.y, ds, ds, 0, WHITE);
                     drew_sprite = true;
@@ -1576,14 +1650,11 @@ void render_system(Game& game) {
             float bx = tf.position.x - bw / 2;
             float by = tf.position.y - display_half - 8;
             DrawRectangle(static_cast<int>(bx), static_cast<int>(by), static_cast<int>(bw), 4, DARKGRAY);
-            DrawRectangle(static_cast<int>(bx), static_cast<int>(by),
-                         static_cast<int>(bw * hp.ratio()), 4, LIME);
+            DrawRectangle(static_cast<int>(bx), static_cast<int>(by), static_cast<int>(bw * hp.ratio()), 4, LIME);
 
             // Level text
             auto lvl_text = std::format("Lv{}", hero.level);
-            draw_text(game.assets, lvl_text.c_str(),
-                    tf.position.x - 8, tf.position.y + display_half + 2,
-                    10, WHITE);
+            draw_text(game.assets, lvl_text.c_str(), tf.position.x - 8, tf.position.y + display_half + 2, 10, WHITE);
         }
     }
 
@@ -1596,10 +1667,7 @@ void render_system(Game& game) {
             c.a = static_cast<unsigned char>(255 * alpha);
             float y_off = (ft.max_time - lt.remaining) * ft.speed;
             float tw = measure_text(game.assets, ft.text.c_str(), 14);
-            draw_text(game.assets, ft.text.c_str(),
-                    tf.position.x - tw / 2,
-                    tf.position.y - y_off,
-                    14, c);
+            draw_text(game.assets, ft.text.c_str(), tf.position.x - tw / 2, tf.position.y - y_off, 14, c);
         }
     }
 }
@@ -1628,8 +1696,7 @@ void ui_system(Game& game) {
     DrawRectangle(0, 0, SCREEN_WIDTH, HUD_HEIGHT, {30, 30, 40, 240});
 
     draw_text(a, std::format("Gold: {}", ps.gold).c_str(), 10, 14, 20, GOLD);
-    draw_text(a, std::format("Lives: {}", ps.lives).c_str(), 180, 14, 20,
-             ps.lives > 5 ? GREEN : RED);
+    draw_text(a, std::format("Lives: {}", ps.lives).c_str(), 180, 14, 20, ps.lives > 5 ? GREEN : RED);
     draw_text(a, std::format("Wave: {}/{}", ps.current_wave, MAX_WAVES).c_str(), 340, 14, 20, WHITE);
     draw_text(a, std::format("Kills: {}", ps.total_kills).c_str(), 520, 14, 20, LIGHTGRAY);
 
@@ -1657,9 +1724,11 @@ void ui_system(Game& game) {
             Color ac = hero.abilities[i].ready() ? GREEN : DARKGRAY;
             DrawRectangle(ax, 4, 90, 38, {40, 40, 50, 200});
             DrawRectangleLinesEx({static_cast<float>(ax), 4, 90, 38}, 1, ac);
-            draw_text(a, std::format("[{}] {}", ability_keys[i], ability_names[i]).c_str(), static_cast<float>(ax + 4), 8, 12, ac);
+            draw_text(a, std::format("[{}] {}", ability_keys[i], ability_names[i]).c_str(), static_cast<float>(ax + 4),
+                      8, 12, ac);
             if (!hero.abilities[i].ready()) {
-                draw_text(a, std::format("{:.1f}s", hero.abilities[i].timer).c_str(), static_cast<float>(ax + 20), 24, 12, RED);
+                draw_text(a, std::format("{:.1f}s", hero.abilities[i].timer).c_str(), static_cast<float>(ax + 20), 24,
+                          12, RED);
             } else {
                 draw_text(a, "Ready", static_cast<float>(ax + 20), 24, 12, GREEN);
             }
@@ -1671,28 +1740,14 @@ void ui_system(Game& game) {
     DrawRectangle(px, HUD_HEIGHT, PANEL_WIDTH, SCREEN_HEIGHT - HUD_HEIGHT, {30, 30, 40, 220});
     draw_text(a, "TOWERS", static_cast<float>(px + 70), static_cast<float>(HUD_HEIGHT + 8), 18, WHITE);
 
-    const TowerType tower_types[] = {
-        TowerType::Arrow, TowerType::Cannon, TowerType::Ice,
-        TowerType::Lightning, TowerType::Poison, TowerType::Laser
-    };
+    const TowerType tower_types[] = {TowerType::Arrow,     TowerType::Cannon, TowerType::Ice,
+                                     TowerType::Lightning, TowerType::Poison, TowerType::Laser};
 
     const char* tower_descs[] = {
-        "Reliable single-target damage",
-        "Slow but deals AoE splash damage",
-        "Slows enemies in range",
-        "Chains lightning between enemies",
-        "Poisons enemies with damage over time",
-        "Continuous laser beam with burn"
-    };
+        "Reliable single-target damage",    "Slow but deals AoE splash damage",      "Slows enemies in range",
+        "Chains lightning between enemies", "Poisons enemies with damage over time", "Continuous laser beam with burn"};
 
-    const char* effect_descs[] = {
-        "",
-        "AoE splash",
-        "Slow 50%",
-        "Chain x2",
-        "Poison DoT",
-        "Burn DoT"
-    };
+    const char* effect_descs[] = {"", "AoE splash", "Slow 50%", "Chain x2", "Poison DoT", "Burn DoT"};
 
     for (int i = 0; i < 6; ++i) {
         auto& stats = game.tower_registry.get(tower_types[i], 1);
@@ -1701,15 +1756,16 @@ void ui_system(Game& game) {
 
         bool affordable = ps.gold >= stats.cost;
         bool is_placing = ps.placing_tower.has_value() && *ps.placing_tower == tower_types[i];
-        Color bg = is_placing ? Color{60, 100, 60, 255} : (affordable ? Color{50, 50, 60, 255} : Color{40, 30, 30, 255});
+        Color bg =
+            is_placing ? Color{60, 100, 60, 255} : (affordable ? Color{50, 50, 60, 255} : Color{40, 30, 30, 255});
         Color fg = affordable ? WHITE : DARKGRAY;
 
         DrawRectangleRec(btn, bg);
         DrawRectangleLinesEx(btn, 1, fg);
 
         // Tower color preview — use weapon texture if available
-        const char* weapon_names[] = {assets::TOWER_ARROW, assets::TOWER_CANNON, assets::TOWER_ICE,
-                                       assets::TOWER_LIGHTNING, assets::TOWER_POISON, assets::TOWER_LASER};
+        const char* weapon_names[] = {assets::TOWER_ARROW,     assets::TOWER_CANNON, assets::TOWER_ICE,
+                                      assets::TOWER_LIGHTNING, assets::TOWER_POISON, assets::TOWER_LASER};
         Texture2D* preview_tex = a.get_texture(weapon_names[i]);
         if (preview_tex) {
             draw_tex(preview_tex, static_cast<float>(px + 30), static_cast<float>(by + 25), 30, 30, 0, WHITE);
@@ -1718,11 +1774,12 @@ void ui_system(Game& game) {
         }
 
         draw_text(a, stats.name.c_str(), static_cast<float>(px + 52), static_cast<float>(by + 5), 16, fg);
-        draw_text(a, std::format("{}g  Dmg:{}", stats.cost, stats.damage).c_str(), static_cast<float>(px + 52), static_cast<float>(by + 22), 12, fg);
-        float dps = (tower_types[i] == TowerType::Laser)
-            ? stats.damage / stats.fire_rate
-            : stats.damage * stats.fire_rate;
-        draw_text(a, std::format("Rng:{:.0f} DPS:{:.0f}", stats.range, dps).c_str(), static_cast<float>(px + 52), static_cast<float>(by + 35), 10, GRAY);
+        draw_text(a, std::format("{}g  Dmg:{}", stats.cost, stats.damage).c_str(), static_cast<float>(px + 52),
+                  static_cast<float>(by + 22), 12, fg);
+        float dps =
+            (tower_types[i] == TowerType::Laser) ? stats.damage / stats.fire_rate : stats.damage * stats.fire_rate;
+        draw_text(a, std::format("Rng:{:.0f} DPS:{:.0f}", stats.range, dps).c_str(), static_cast<float>(px + 52),
+                  static_cast<float>(by + 35), 10, GRAY);
 
         // Hover tooltip
         bool hovered = CheckCollisionPointRec(GetMousePosition(), btn);
@@ -1733,9 +1790,13 @@ void ui_system(Game& game) {
             DrawRectangleLinesEx({static_cast<float>(tx), static_cast<float>(ty), 200, 90}, 1, GOLD);
             draw_text(a, stats.name.c_str(), static_cast<float>(tx + 8), static_cast<float>(ty + 5), 16, GOLD);
             draw_text(a, tower_descs[i], static_cast<float>(tx + 8), static_cast<float>(ty + 24), 10, LIGHTGRAY);
-            draw_text(a, std::format("Damage: {}  Range: {:.0f}", stats.damage, stats.range).c_str(), static_cast<float>(tx + 8), static_cast<float>(ty + 40), 11, WHITE);
-            draw_text(a, std::format("DPS: {:.1f}  Rate: {:.2f}/s", dps, stats.fire_rate).c_str(), static_cast<float>(tx + 8), static_cast<float>(ty + 54), 11, WHITE);
-            if (i > 0) draw_text(a, effect_descs[i], static_cast<float>(tx + 8), static_cast<float>(ty + 70), 11, {200, 200, 100, 255});
+            draw_text(a, std::format("Damage: {}  Range: {:.0f}", stats.damage, stats.range).c_str(),
+                      static_cast<float>(tx + 8), static_cast<float>(ty + 40), 11, WHITE);
+            draw_text(a, std::format("DPS: {:.1f}  Rate: {:.2f}/s", dps, stats.fire_rate).c_str(),
+                      static_cast<float>(tx + 8), static_cast<float>(ty + 54), 11, WHITE);
+            if (i > 0)
+                draw_text(a, effect_descs[i], static_cast<float>(tx + 8), static_cast<float>(ty + 70), 11,
+                          {200, 200, 100, 255});
         }
 
         // Click handler
@@ -1787,18 +1848,17 @@ void ui_system(Game& game) {
         DrawLineEx({line_start_x, line_start_y}, {line_end_x, line_end_y}, 1.5f, {255, 255, 255, 60});
 
         // Background with rounded corners effect (draw slightly overlapping rects + border)
-        DrawRectangle(static_cast<int>(pop_x), static_cast<int>(pop_y),
-                     static_cast<int>(pop_w), static_cast<int>(pop_h), {22, 24, 32, 235});
+        DrawRectangle(static_cast<int>(pop_x), static_cast<int>(pop_y), static_cast<int>(pop_w),
+                      static_cast<int>(pop_h), {22, 24, 32, 235});
         DrawRectangleLinesEx({pop_x, pop_y, pop_w, pop_h}, 1.5f, {80, 85, 100, 200});
 
         // Header bar with tower name + level
-        DrawRectangle(static_cast<int>(pop_x), static_cast<int>(pop_y),
-                     static_cast<int>(pop_w), 28, {35, 38, 50, 255});
+        DrawRectangle(static_cast<int>(pop_x), static_cast<int>(pop_y), static_cast<int>(pop_w), 28, {35, 38, 50, 255});
         DrawLineEx({pop_x, pop_y + 28}, {pop_x + pop_w, pop_y + 28}, 1.0f, {80, 85, 100, 200});
 
         // Tower weapon icon in header
-        const char* weapon_names[] = {assets::TOWER_ARROW, assets::TOWER_CANNON, assets::TOWER_ICE,
-                                       assets::TOWER_LIGHTNING, assets::TOWER_POISON, assets::TOWER_LASER};
+        const char* weapon_names[] = {assets::TOWER_ARROW,     assets::TOWER_CANNON, assets::TOWER_ICE,
+                                      assets::TOWER_LIGHTNING, assets::TOWER_POISON, assets::TOWER_LASER};
         int type_idx = static_cast<int>(tower.type);
         Texture2D* icon_tex = (type_idx >= 0 && type_idx < 6) ? a.get_texture(weapon_names[type_idx]) : nullptr;
         if (icon_tex) {
@@ -1813,7 +1873,8 @@ void ui_system(Game& game) {
         for (int p = 0; p < TowerRegistry::MAX_LEVEL; ++p) {
             Color pip_col = (p < tower.level) ? GOLD : Color{50, 52, 60, 255};
             DrawCircle(static_cast<int>(pip_x + p * 14 + 5), static_cast<int>(pop_y + 14), 5.0f, pip_col);
-            DrawCircleLines(static_cast<int>(pip_x + p * 14 + 5), static_cast<int>(pop_y + 14), 5.0f, {80, 85, 100, 255});
+            DrawCircleLines(static_cast<int>(pip_x + p * 14 + 5), static_cast<int>(pop_y + 14), 5.0f,
+                            {80, 85, 100, 255});
         }
 
         // Stats section
@@ -1822,9 +1883,7 @@ void ui_system(Game& game) {
         float val_x = pop_x + 90;
 
         // DPS calculation
-        float dps = (tower.type == TowerType::Laser)
-            ? tower.damage / tower.fire_rate
-            : tower.damage * tower.fire_rate;
+        float dps = (tower.type == TowerType::Laser) ? tower.damage / tower.fire_rate : tower.damage * tower.fire_rate;
 
         draw_text(a, "Damage", label_x, sy, 13, {160, 165, 180, 255});
         draw_text(a, std::format("{}", tower.damage).c_str(), val_x, sy, 13, WHITE);
@@ -1844,14 +1903,25 @@ void ui_system(Game& game) {
             int ei = static_cast<int>(tower.effect);
             Color eff_col;
             switch (tower.effect) {
-                case EffectType::Slow:   eff_col = {100, 180, 255, 255}; break;
-                case EffectType::Poison: eff_col = {100, 220, 50, 255}; break;
-                case EffectType::Burn:   eff_col = {255, 140, 50, 255}; break;
-                case EffectType::Stun:   eff_col = {255, 255, 100, 255}; break;
-                default:                 eff_col = WHITE; break;
+            case EffectType::Slow:
+                eff_col = {100, 180, 255, 255};
+                break;
+            case EffectType::Poison:
+                eff_col = {100, 220, 50, 255};
+                break;
+            case EffectType::Burn:
+                eff_col = {255, 140, 50, 255};
+                break;
+            case EffectType::Stun:
+                eff_col = {255, 255, 100, 255};
+                break;
+            default:
+                eff_col = WHITE;
+                break;
             }
             draw_text(a, "Effect", label_x, sy, 13, {160, 165, 180, 255});
-            draw_text(a, std::format("{} {:.1f}s", eff_names[ei], tower.effect_duration).c_str(), val_x, sy, 13, eff_col);
+            draw_text(a, std::format("{} {:.1f}s", eff_names[ei], tower.effect_duration).c_str(), val_x, sy, 13,
+                      eff_col);
             sy += 17;
         }
 
@@ -1863,9 +1933,11 @@ void ui_system(Game& game) {
             float bar_x = val_x;
             float bar_w = pop_w - val_x + pop_x - 12;
             float bar_h = 10;
-            DrawRectangle(static_cast<int>(bar_x), static_cast<int>(sy + 2), static_cast<int>(bar_w), static_cast<int>(bar_h), {40, 40, 50, 255});
+            DrawRectangle(static_cast<int>(bar_x), static_cast<int>(sy + 2), static_cast<int>(bar_w),
+                          static_cast<int>(bar_h), {40, 40, 50, 255});
             Color hp_col = thp.ratio() > 0.5f ? GREEN : (thp.ratio() > 0.25f ? YELLOW : RED);
-            DrawRectangle(static_cast<int>(bar_x), static_cast<int>(sy + 2), static_cast<int>(bar_w * thp.ratio()), static_cast<int>(bar_h), hp_col);
+            DrawRectangle(static_cast<int>(bar_x), static_cast<int>(sy + 2), static_cast<int>(bar_w * thp.ratio()),
+                          static_cast<int>(bar_h), hp_col);
             draw_text(a, std::format("{}/{}", thp.current, thp.max).c_str(), bar_x + 2, sy, 11, WHITE);
             sy += 17;
         }
@@ -1883,21 +1955,20 @@ void ui_system(Game& game) {
             auto& thp = game.registry.get<Health>(ps.selected_tower);
             if (thp.current < thp.max) {
                 int missing = thp.max - thp.current;
-                int repair_cost = std::max(1, missing / 4);  // 4 HP per gold
+                int repair_cost = std::max(1, missing / 4); // 4 HP per gold
                 bool can_repair = ps.gold >= repair_cost;
                 Rectangle rbtn = {pop_x + btn_margin, sy, btn_area_w, btn_h};
                 bool r_hover = CheckCollisionPointRec(GetMousePosition(), rbtn);
 
-                Color rbg = can_repair
-                    ? (r_hover ? Color{50, 110, 140, 255} : Color{35, 80, 110, 255})
-                    : Color{50, 50, 55, 255};
+                Color rbg = can_repair ? (r_hover ? Color{50, 110, 140, 255} : Color{35, 80, 110, 255})
+                                       : Color{50, 50, 55, 255};
                 DrawRectangleRec(rbtn, rbg);
                 DrawRectangleLinesEx(rbtn, 1.0f, can_repair ? Color{70, 160, 200, 200} : Color{70, 70, 80, 200});
 
                 auto repair_label = std::format("Repair {}g  ({} HP)", repair_cost, missing);
                 float rl_w = measure_text(a, repair_label.c_str(), 12);
                 draw_text(a, repair_label.c_str(), rbtn.x + (rbtn.width - rl_w) / 2, rbtn.y + 7, 12,
-                         can_repair ? WHITE : Color{100, 100, 110, 255});
+                          can_repair ? WHITE : Color{100, 100, 110, 255});
 
                 if (can_repair && r_hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                     ps.gold -= repair_cost;
@@ -1918,16 +1989,15 @@ void ui_system(Game& game) {
             Rectangle ubtn = {pop_x + btn_margin, sy, ubtn_w, btn_h};
             bool u_hover = CheckCollisionPointRec(GetMousePosition(), ubtn);
 
-            Color ubg = can_upgrade
-                ? (u_hover ? Color{60, 130, 60, 255} : Color{45, 100, 45, 255})
-                : Color{50, 50, 55, 255};
+            Color ubg =
+                can_upgrade ? (u_hover ? Color{60, 130, 60, 255} : Color{45, 100, 45, 255}) : Color{50, 50, 55, 255};
             DrawRectangleRec(ubtn, ubg);
             DrawRectangleLinesEx(ubtn, 1.0f, can_upgrade ? Color{80, 180, 80, 200} : Color{70, 70, 80, 200});
 
             auto upgrade_label = std::format("Upgrade {}g", ucost);
             float ul_w = measure_text(a, upgrade_label.c_str(), 12);
             draw_text(a, upgrade_label.c_str(), ubtn.x + (ubtn.width - ul_w) / 2, ubtn.y + 7, 12,
-                     can_upgrade ? WHITE : Color{100, 100, 110, 255});
+                      can_upgrade ? WHITE : Color{100, 100, 110, 255});
 
             if (can_upgrade && u_hover && IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
                 ps.gold -= ucost;
@@ -2010,7 +2080,8 @@ void ui_system(Game& game) {
         // Pre-game countdown before first wave
         auto wave_text = std::format("First wave in {:.1f}s", std::max(0.0f, ps.wave_timer));
         float wtw = measure_text(a, wave_text.c_str(), 18);
-        draw_text(a, wave_text.c_str(), SCREEN_WIDTH / 2.0f - wtw / 2, static_cast<float>(SCREEN_HEIGHT - 30), 18, YELLOW);
+        draw_text(a, wave_text.c_str(), SCREEN_WIDTH / 2.0f - wtw / 2, static_cast<float>(SCREEN_HEIGHT - 30), 18,
+                  YELLOW);
         auto space_text = "Press SPACE to start early";
         float stw = measure_text(a, space_text, 14);
         draw_text(a, space_text, SCREEN_WIDTH / 2.0f - stw / 2, static_cast<float>(SCREEN_HEIGHT - 50), 14, GRAY);
@@ -2018,7 +2089,8 @@ void ui_system(Game& game) {
         // Show current wave and enemies alive
         auto rem_text = std::format("Wave {}/{}  -  {} enemies alive", ps.current_wave, MAX_WAVES, ps.enemies_alive);
         float rw = measure_text(a, rem_text.c_str(), 14);
-        draw_text(a, rem_text.c_str(), SCREEN_WIDTH / 2.0f - rw / 2, static_cast<float>(SCREEN_HEIGHT - 30), 14, {200, 200, 200, 200});
+        draw_text(a, rem_text.c_str(), SCREEN_WIDTH / 2.0f - rw / 2, static_cast<float>(SCREEN_HEIGHT - 30), 14,
+                  {200, 200, 200, 200});
     }
 
     // Wave announcement banner
@@ -2034,18 +2106,17 @@ void ui_system(Game& game) {
 
     // Tutorial overlay
     if (ps.tutorial.active && !ps.tutorial.completed) {
-        const char* hints[] = {
-            "Move near enemies to attack them and earn gold for towers!",
-            "Once you have gold, click a tower then click a green tile to place it.",
-            "WASD to move hero. Q/E/R for abilities. Stay close to fight!",
-            "Click a placed tower to upgrade it. Sell for 50% refund.",
-            "P to pause, F for fast-forward. Good luck!"
-        };
+        const char* hints[] = {"Move near enemies to attack them and earn gold for towers!",
+                               "Once you have gold, click a tower then click a green tile to place it.",
+                               "WASD to move hero. Q/E/R for abilities. Stay close to fight!",
+                               "Click a placed tower to upgrade it. Sell for 50% refund.",
+                               "P to pause, F for fast-forward. Good luck!"};
         int step = std::clamp(ps.tutorial.step, 0, 4);
         float tw = measure_text(a, hints[step], 16);
         float tx = SCREEN_WIDTH / 2.0f - tw / 2.0f - 10;
         float ty = SCREEN_HEIGHT / 2.0f + 40;
-        DrawRectangle(static_cast<int>(tx - 5), static_cast<int>(ty - 5), static_cast<int>(tw + 20), 30, {0, 0, 0, 180});
+        DrawRectangle(static_cast<int>(tx - 5), static_cast<int>(ty - 5), static_cast<int>(tw + 20), 30,
+                      {0, 0, 0, 180});
         DrawRectangleLinesEx({tx - 5, ty - 5, tw + 20, 30.0f}, 1, GOLD);
         draw_text(a, hints[step], tx + 5, ty + 2, 16, GOLD);
         auto dismiss_text = "[TAB to dismiss]";
@@ -2054,8 +2125,8 @@ void ui_system(Game& game) {
     }
 
     // Controls help
-    draw_text(a, "WASD:Move  Q:Fire  E:Heal  R:Lightning  P:Pause  F:Speed  M:Mute  ESC:Menu",
-            10, static_cast<float>(SCREEN_HEIGHT - 18), 12, {150, 150, 150, 180});
+    draw_text(a, "WASD:Move  Q:Fire  E:Heal  R:Lightning  P:Pause  F:Speed  M:Mute  ESC:Menu", 10,
+              static_cast<float>(SCREEN_HEIGHT - 18), 12, {150, 150, 150, 180});
 }
 
 } // namespace ls::systems

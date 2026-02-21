@@ -1,6 +1,6 @@
 #include "paused_state.hpp"
-#include "core/game.hpp"
 #include "core/asset_paths.hpp"
+#include "core/game.hpp"
 #include "systems/systems.hpp"
 #include <format>
 
@@ -47,8 +47,10 @@ void PausedState::update(Game& game, [[maybe_unused]] float dt) {
 
     auto play_click = [&]() {
         Sound* click = game.assets.get_sound(assets::SND_CLICK);
-        if (click) PlaySound(*click);
-        else game.sounds.play(game.sounds.ui_click);
+        if (click)
+            PlaySound(*click);
+        else
+            game.sounds.play(game.sounds.ui_click);
     };
 
     if (IsKeyPressed(KEY_DOWN) || IsKeyPressed(KEY_S)) {
@@ -69,22 +71,25 @@ void PausedState::update(Game& game, [[maybe_unused]] float dt) {
     if (IsKeyPressed(KEY_ENTER) || IsKeyPressed(KEY_SPACE)) {
         play_click();
         switch (selected_) {
-            case 0: // Resume
-                game.state_machine.resume_state(GameStateId::Playing, game);
-                break;
-            case 1: // Save Game
-                do_save(game);
-                save_flash_ = 1.5f;
-                break;
-            case 2: // Settings
-                // Volume controls shown inline
-                break;
-            case 3: // Quit to Menu
-                do_save(game); // Auto-save before quitting
-                if (game.current_music) { StopMusicStream(*game.current_music); game.current_music = nullptr; }
-                game.state_machine.set_active_game(true); // Mark that a game can be resumed
-                game.state_machine.change_state(GameStateId::Menu, game);
-                break;
+        case 0: // Resume
+            game.state_machine.resume_state(GameStateId::Playing, game);
+            break;
+        case 1: // Save Game
+            do_save(game);
+            save_flash_ = 1.5f;
+            break;
+        case 2: // Settings
+            // Volume controls shown inline
+            break;
+        case 3:            // Quit to Menu
+            do_save(game); // Auto-save before quitting
+            if (game.current_music) {
+                StopMusicStream(*game.current_music);
+                game.current_music = nullptr;
+            }
+            game.state_machine.set_active_game(true); // Mark that a game can be resumed
+            game.state_machine.change_state(GameStateId::Menu, game);
+            break;
         }
     }
 
@@ -148,8 +153,7 @@ void PausedState::render(Game& game) {
 
             auto mute_text = std::format("Music: {}  [M to toggle]", game.music_muted ? "MUTED" : "ON");
             float mw = pause_measure(a, mute_text.c_str(), 14);
-            pause_text(a, mute_text.c_str(), SCREEN_WIDTH / 2.0f - mw / 2, sy + 18, 14,
-                      game.music_muted ? RED : GREEN);
+            pause_text(a, mute_text.c_str(), SCREEN_WIDTH / 2.0f - mw / 2, sy + 18, 14, game.music_muted ? RED : GREEN);
         }
     }
 
