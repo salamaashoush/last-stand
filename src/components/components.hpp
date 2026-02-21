@@ -124,6 +124,11 @@ struct Projectile {
 struct Enemy {
     EnemyType type{};
     Gold reward{};
+    int attack_damage{5};
+    float attack_range{30.0f};
+    float attack_cooldown{1.0f};
+    float attack_timer{0.0f};
+    float collision_radius{10.0f};
 };
 
 struct PathFollower {

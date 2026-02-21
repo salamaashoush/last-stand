@@ -545,7 +545,7 @@ void damage_system([[maybe_unused]] Game& game, [[maybe_unused]] float dt) {
 // ============================================================
 void health_system(Game& game, [[maybe_unused]] float dt) {
     auto& reg = game.registry;
-    auto view = reg.view<Health>(entt::exclude<Dead, Hero>);
+    auto view = reg.view<Health>(entt::exclude<Dead, Hero, Tower>);
 
     for (auto [e, hp] : view.each()) {
         if (hp.current <= 0) {
@@ -721,6 +721,165 @@ void boss_system(Game& game, float dt) {
                     break;
                 }
             }
+        }
+    }
+}
+
+// ============================================================
+// Enemy Combat System - Enemies attack hero and towers
+// ============================================================
+void enemy_combat_system(Game& game, float dt) {
+    auto& reg = game.registry;
+    auto enemies = reg.view<Enemy, Transform>();
+
+    for (auto [e, en, tf] : enemies.each()) {
+        if (reg.all_of<Dead>(e)) continue;
+
+        en.attack_timer -= dt;
+        if (en.attack_timer > 0.0f) continue;
+
+        // Attack hero if in range
+        auto heroes = reg.view<Hero, Transform, Health>();
+        for (auto [he, hero, htf, hhp] : heroes.each()) {
+            float dist = tf.position.distance_to(htf.position);
+            if (dist < en.attack_range + 12.0f) {
+                int actual = std::max(1, en.attack_damage - hhp.armor);
+                hhp.current -= actual;
+                en.attack_timer = en.attack_cooldown;
+                create_floating_text(reg, htf.position, "-" + std::to_string(actual), RED);
+                // Hit particles
+                float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
+                create_particle(reg, htf.position,
+                    {std::cos(angle) * 30.0f, std::sin(angle) * 30.0f},
+                    RED, 3.0f, 0.2f);
+                break; // Only attack one target per tick
+            }
+        }
+
+        if (en.attack_timer > 0.0f) continue; // Already attacked hero
+
+        // Tanks and bosses also attack towers in range
+        if (en.type == EnemyType::Tank || en.type == EnemyType::Boss) {
+            auto towers = reg.view<Tower, Transform, Health>();
+            float best_dist = en.attack_range + 20.0f;
+            entt::entity nearest_tower = entt::null;
+            for (auto [te, tower, ttf, thp] : towers.each()) {
+                if (reg.all_of<Dead>(te)) continue;
+                float d = tf.position.distance_to(ttf.position);
+                if (d < best_dist) {
+                    best_dist = d;
+                    nearest_tower = te;
+                }
+            }
+            if (nearest_tower != entt::null) {
+                auto& thp = reg.get<Health>(nearest_tower);
+                auto& ttf = reg.get<Transform>(nearest_tower);
+                int actual = en.attack_damage;
+                thp.current -= actual;
+                en.attack_timer = en.attack_cooldown;
+                create_floating_text(reg, ttf.position, "-" + std::to_string(actual), {255, 100, 100, 255});
+                // Spark
+                create_particle(reg, ttf.position,
+                    {static_cast<float>(GetRandomValue(-30, 30)), static_cast<float>(GetRandomValue(-30, 30))},
+                    {255, 200, 50, 255}, 3.0f, 0.3f);
+            }
+        }
+    }
+}
+
+// ============================================================
+// Body Collision System - Push hero and enemies apart
+// ============================================================
+void body_collision_system(Game& game, [[maybe_unused]] float dt) {
+    auto& reg = game.registry;
+
+    // Hero vs enemies
+    auto heroes = reg.view<Hero, Transform, Sprite>();
+    auto enemies = reg.view<Enemy, Transform, Sprite>();
+
+    for (auto [he, hero, htf, hspr] : heroes.each()) {
+        float hero_radius = hspr.width * 0.4f;
+
+        for (auto [ee, en, etf, espr] : enemies.each()) {
+            if (reg.all_of<Dead>(ee)) continue;
+            // Flying enemies don't collide with hero
+            if (reg.all_of<Flying>(ee)) continue;
+
+            float enemy_radius = en.collision_radius;
+            float min_dist = hero_radius + enemy_radius;
+            Vec2 diff = htf.position - etf.position;
+            float dist = diff.length();
+
+            if (dist < min_dist && dist > 0.01f) {
+                // Push apart
+                Vec2 push = diff.normalized() * ((min_dist - dist) * 0.5f);
+                htf.position = htf.position + push;
+                etf.position = etf.position - push;
+            }
+        }
+    }
+
+    // Enemy vs enemy (lighter push)
+    auto all_enemies = reg.view<Enemy, Transform>();
+    for (auto [e1, en1, tf1] : all_enemies.each()) {
+        if (reg.all_of<Dead>(e1)) continue;
+        if (reg.all_of<Flying>(e1)) continue;
+        for (auto [e2, en2, tf2] : all_enemies.each()) {
+            if (e1 >= e2) continue; // avoid double-checking
+            if (reg.all_of<Dead>(e2)) continue;
+            if (reg.all_of<Flying>(e2)) continue;
+
+            float min_dist = en1.collision_radius + en2.collision_radius;
+            Vec2 diff = tf1.position - tf2.position;
+            float dist = diff.length();
+
+            if (dist < min_dist && dist > 0.01f) {
+                Vec2 push = diff.normalized() * ((min_dist - dist) * 0.3f);
+                tf1.position = tf1.position + push;
+                tf2.position = tf2.position - push;
+            }
+        }
+    }
+}
+
+// ============================================================
+// Tower Health System - Destroy towers when HP reaches 0
+// ============================================================
+void tower_health_system(Game& game, [[maybe_unused]] float dt) {
+    auto& reg = game.registry;
+    auto view = reg.view<Tower, Health, Transform>();
+
+    std::vector<entt::entity> to_destroy;
+
+    for (auto [e, tower, hp, tf] : view.each()) {
+        if (hp.current <= 0) {
+            to_destroy.push_back(e);
+            // Destruction particles
+            auto& spr = reg.get<Sprite>(e);
+            for (int i = 0; i < 10; ++i) {
+                float angle = static_cast<float>(GetRandomValue(0, 360)) * DEG2RAD;
+                float spd = static_cast<float>(GetRandomValue(30, 80));
+                create_particle(reg, tf.position,
+                    {std::cos(angle) * spd, std::sin(angle) * spd},
+                    spr.color, 5.0f, 0.5f);
+            }
+            create_floating_text(reg, tf.position, "DESTROYED!", RED);
+            game.play.shake_intensity = 4.0f;
+            game.play.shake_timer = 0.2f;
+        }
+    }
+
+    for (auto e : to_destroy) {
+        if (reg.valid(e)) {
+            if (reg.all_of<GridCell>(e)) {
+                auto& gc = reg.get<GridCell>(e);
+                game.play.tower_positions.erase(gc.pos);
+            }
+            if (game.play.selected_tower == e) {
+                game.play.selected_tower = entt::null;
+            }
+            reg.destroy(e);
+            game.recalculate_path();
         }
     }
 }
@@ -1001,6 +1160,20 @@ void render_system(Game& game) {
                     {tf.position.x - hw - 2, tf.position.y - hh - 2, spr.width + 4, spr.height + 4},
                     2, WHITE);
             }
+
+            // Tower health bar
+            if (reg.all_of<Health>(e)) {
+                auto& hp = reg.get<Health>(e);
+                if (hp.current < hp.max) {
+                    float bw = 40;
+                    float bx = tf.position.x - bw / 2;
+                    float by = tf.position.y - hh - 8;
+                    DrawRectangle(static_cast<int>(bx), static_cast<int>(by), static_cast<int>(bw), 3, DARKGRAY);
+                    Color hpc = hp.ratio() > 0.5f ? LIME : (hp.ratio() > 0.25f ? YELLOW : RED);
+                    DrawRectangle(static_cast<int>(bx), static_cast<int>(by),
+                                 static_cast<int>(bw * hp.ratio()), 3, hpc);
+                }
+            }
         }
     }
 
@@ -1174,6 +1347,11 @@ void ui_system(Game& game) {
         DrawText(std::format("Level: {}", tower.level).c_str(), px + 15, iy + 25, 14, WHITE);
         DrawText(std::format("Damage: {}", tower.damage).c_str(), px + 15, iy + 42, 14, WHITE);
         DrawText(std::format("Range: {:.0f}", tower.range).c_str(), px + 15, iy + 58, 14, WHITE);
+        if (game.registry.all_of<Health>(ps.selected_tower)) {
+            auto& thp = game.registry.get<Health>(ps.selected_tower);
+            DrawText(std::format("HP: {}/{}", thp.current, thp.max).c_str(), px + 15, iy + 74, 14,
+                     thp.ratio() > 0.5f ? GREEN : (thp.ratio() > 0.25f ? YELLOW : RED));
+        }
 
         if (tower.level < TowerRegistry::MAX_LEVEL) {
             int ucost = game.tower_registry.upgrade_cost(tower.type, tower.level);

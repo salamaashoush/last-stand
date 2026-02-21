@@ -21,6 +21,9 @@ void collision_system(Game& game, float dt);
 void lifetime_system(Game& game, float dt);
 void particle_system(Game& game, float dt);
 void boss_system(Game& game, float dt);
+void enemy_combat_system(Game& game, float dt);
+void body_collision_system(Game& game, float dt);
+void tower_health_system(Game& game, float dt);
 void render_system(Game& game);
 void ui_system(Game& game);
 

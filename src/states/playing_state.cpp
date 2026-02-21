@@ -317,12 +317,15 @@ void PlayingState::update(Game& game, float dt) {
     systems::path_follow_system(game, scaled_dt);
     systems::boss_system(game, scaled_dt);
     systems::movement_system(game, scaled_dt);
+    systems::body_collision_system(game, scaled_dt);
+    systems::enemy_combat_system(game, scaled_dt);
     systems::tower_targeting_system(game, scaled_dt);
     systems::tower_attack_system(game, scaled_dt);
     systems::projectile_system(game, scaled_dt);
     systems::aura_system(game, scaled_dt);
     systems::effect_system(game, scaled_dt);
     systems::health_system(game, scaled_dt);
+    systems::tower_health_system(game, scaled_dt);
     systems::collision_system(game, scaled_dt);
     systems::lifetime_system(game, scaled_dt);
     systems::particle_system(game, scaled_dt);

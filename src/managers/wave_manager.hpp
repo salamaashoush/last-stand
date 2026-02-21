@@ -29,7 +29,7 @@ public:
     WaveNum total_waves() const { return static_cast<WaveNum>(waves_.size()); }
 
     float scaling(WaveNum wave) const {
-        return 1.0f + (wave - 1) * 0.15f;
+        return 1.0f + (wave - 1) * 0.2f;
     }
 
 private:
@@ -40,20 +40,22 @@ private:
             wave.number = w;
             wave.is_boss_wave = (w % BOSS_WAVE_INTERVAL == 0);
 
-            int base_count = 5 + w;
+            int base_count = 6 + static_cast<int>(w * 1.2f);
+            float interval = std::max(0.3f, SPAWN_INTERVAL - w * 0.008f);
 
             if (wave.is_boss_wave) {
                 // Regular enemies before boss
-                wave.spawns.push_back({EnemyType::Grunt, base_count / 2, SPAWN_INTERVAL});
-                if (w >= 10) wave.spawns.push_back({EnemyType::Tank, 2, SPAWN_INTERVAL * 1.5f});
+                wave.spawns.push_back({EnemyType::Grunt, base_count / 2 + 2, interval});
+                if (w >= 10) wave.spawns.push_back({EnemyType::Tank, 3, interval * 1.5f});
+                if (w >= 15) wave.spawns.push_back({EnemyType::Runner, 4, interval * 0.7f});
                 wave.spawns.push_back({EnemyType::Boss, 1, 2.0f});
             } else {
-                wave.spawns.push_back({EnemyType::Grunt, base_count, SPAWN_INTERVAL});
+                wave.spawns.push_back({EnemyType::Grunt, base_count, interval});
 
-                if (w >= 3) wave.spawns.push_back({EnemyType::Runner, static_cast<int>(w / 3), SPAWN_INTERVAL * 0.8f});
-                if (w >= 6) wave.spawns.push_back({EnemyType::Tank, static_cast<int>(w / 6), SPAWN_INTERVAL * 1.5f});
-                if (w >= 9) wave.spawns.push_back({EnemyType::Healer, static_cast<int>(w / 9), SPAWN_INTERVAL * 1.2f});
-                if (w >= 12) wave.spawns.push_back({EnemyType::Flying, static_cast<int>(w / 6), SPAWN_INTERVAL});
+                if (w >= 2) wave.spawns.push_back({EnemyType::Runner, static_cast<int>(w / 2), interval * 0.7f});
+                if (w >= 4) wave.spawns.push_back({EnemyType::Tank, static_cast<int>(w / 4), interval * 1.4f});
+                if (w >= 7) wave.spawns.push_back({EnemyType::Healer, static_cast<int>(w / 6), interval * 1.1f});
+                if (w >= 9) wave.spawns.push_back({EnemyType::Flying, static_cast<int>(w / 4), interval * 0.9f});
             }
 
             waves_.push_back(std::move(wave));
