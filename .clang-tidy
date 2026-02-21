@@ -11,6 +11,7 @@ Checks: >
   -modernize-avoid-c-arrays
 
 WarningsAsErrors: ''
+HeaderFilterRegex: 'src/'
 
 CheckOptions:
   - key: readability-identifier-naming.ClassCase

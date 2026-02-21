@@ -54,4 +54,4 @@ format-check:
 tidy:
 	cmake -B $(BUILD_DIR) -DCMAKE_BUILD_TYPE=$(BUILD_TYPE)
 	cmake --build $(BUILD_DIR) -j$(JOBS)
-	find src -name '*.cpp' -o -name '*.hpp' | xargs clang-tidy -p $(BUILD_DIR)
+	find src -name '*.cpp' | xargs clang-tidy -p $(BUILD_DIR)
