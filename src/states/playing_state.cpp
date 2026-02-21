@@ -53,22 +53,29 @@ static void on_wave_start(Game& g, const WaveStartEvent& evt) {
     }
 
     // Tutorial: advance on wave start
-    if (g.play.tutorial.active && g.play.tutorial.step == 1) {
-        g.play.tutorial.step = 2;
-    }
-}
-
-static void on_wave_complete(Game& g, const WaveCompleteEvent&) {
-    // Tutorial: advance on wave complete
     if (g.play.tutorial.active && g.play.tutorial.step == 2) {
         g.play.tutorial.step = 3;
     }
 }
 
-static void on_tower_placed(Game& g, const TowerPlacedEvent&) {
-    // Tutorial: advance on tower placed
+static void on_wave_complete(Game& g, const WaveCompleteEvent&) {
+    // Tutorial: advance on wave complete
+    if (g.play.tutorial.active && g.play.tutorial.step == 3) {
+        g.play.tutorial.step = 4;
+    }
+}
+
+static void on_enemy_death_tutorial(Game& g, const EnemyDeathEvent&) {
+    // Tutorial: advance from step 0 (fight to earn gold) to step 1 (place tower)
     if (g.play.tutorial.active && g.play.tutorial.step == 0) {
         g.play.tutorial.step = 1;
+    }
+}
+
+static void on_tower_placed(Game& g, const TowerPlacedEvent&) {
+    // Tutorial: advance from step 1 (place tower) to step 2 (abilities)
+    if (g.play.tutorial.active && g.play.tutorial.step == 1) {
+        g.play.tutorial.step = 2;
     }
 }
 
@@ -83,18 +90,18 @@ void PlayingState::enter(Game& game) {
         game.sounds.init();
     }
 
-    // Apply difficulty modifiers
+    // Apply difficulty modifiers (all start 0 gold - earn by fighting)
     switch (game.difficulty) {
         case Difficulty::Easy:
-            game.play.gold = 300;
+            game.play.gold = 0;
             game.play.lives = 30;
             break;
         case Difficulty::Normal:
-            game.play.gold = STARTING_GOLD;
+            game.play.gold = 0;
             game.play.lives = STARTING_LIVES;
             break;
         case Difficulty::Hard:
-            game.play.gold = 150;
+            game.play.gold = 0;
             game.play.lives = 10;
             break;
     }
@@ -145,6 +152,7 @@ void PlayingState::setup_event_handlers(Game& game) {
     game.dispatcher.sink<VictoryEvent>().connect<&on_victory>(game);
     game.dispatcher.sink<WaveStartEvent>().connect<&on_wave_start>(game);
     game.dispatcher.sink<WaveCompleteEvent>().connect<&on_wave_complete>(game);
+    game.dispatcher.sink<EnemyDeathEvent>().connect<&on_enemy_death_tutorial>(game);
     game.dispatcher.sink<TowerPlacedEvent>().connect<&on_tower_placed>(game);
 }
 

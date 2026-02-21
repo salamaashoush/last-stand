@@ -12,7 +12,7 @@ inline constexpr int GRID_OFFSET_Y = 64;
 inline constexpr int GRID_COLS = 24;
 inline constexpr int GRID_ROWS = 12;
 
-inline constexpr int STARTING_GOLD = 200;
+inline constexpr int STARTING_GOLD = 0;
 inline constexpr int STARTING_LIVES = 20;
 inline constexpr int MAX_WAVES = 30;
 inline constexpr int BOSS_WAVE_INTERVAL = 5;

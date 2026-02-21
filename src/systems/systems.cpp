@@ -60,6 +60,11 @@ void hero_system(Game& game, float dt) {
                 ehp.current -= actual;
                 hero.attack_cooldown = HERO_ATTACK_COOLDOWN;
                 create_floating_text(reg, etf.position, std::to_string(actual), YELLOW);
+                // Hero earns gold per hit
+                int hit_gold = 1 + hero.level / 2;
+                game.play.gold += hit_gold;
+                game.play.stats.gold_earned += hit_gold;
+                create_floating_text(reg, tf.position, "+" + std::to_string(hit_gold) + "g", GOLD);
             }
         }
 
@@ -1255,10 +1260,10 @@ void ui_system(Game& game) {
     // Tutorial overlay
     if (ps.tutorial.active && !ps.tutorial.completed) {
         const char* hints[] = {
-            "Click a tower from the panel, then click a green tile to place it",
-            "Towers auto-attack enemies in range. The circle shows range.",
-            "WASD to move hero. Q/E/R for abilities.",
-            "Click a tower to upgrade it. Sell for 50% refund.",
+            "Move near enemies to attack them and earn gold for towers!",
+            "Once you have gold, click a tower then click a green tile to place it.",
+            "WASD to move hero. Q/E/R for abilities. Stay close to fight!",
+            "Click a placed tower to upgrade it. Sell for 50% refund.",
             "P to pause, F for fast-forward. Good luck!"
         };
         int step = std::clamp(ps.tutorial.step, 0, 4);

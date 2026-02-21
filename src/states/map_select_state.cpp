@@ -78,9 +78,9 @@ void MapSelectState::render(Game& game) {
     const char* diff_names[] = {"Easy", "Normal", "Hard"};
     Color diff_colors[] = {GREEN, WHITE, RED};
     const char* diff_descs[] = {
-        "300 Gold | 30 Lives | 0.8x enemies | 1.2x rewards",
-        "200 Gold | 20 Lives | 1.0x enemies | 1.0x rewards",
-        "150 Gold | 10 Lives | 1.3x enemies | 0.8x rewards"
+        "0 Gold | 30 Lives | 0.8x enemies | 1.2x rewards",
+        "0 Gold | 20 Lives | 1.0x enemies | 1.0x rewards",
+        "0 Gold | 10 Lives | 1.3x enemies | 0.8x rewards"
     };
     int di = static_cast<int>(game.difficulty);
 
