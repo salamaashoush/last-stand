@@ -14,7 +14,7 @@ build: configure
 	cmake --build $(BUILD_DIR) -j$(JOBS)
 
 run: build
-	cd $(BUILD_DIR) && ./LastStand
+	./$(BUILD_DIR)/LastStand
 
 clean:
 	rm -rf $(BUILD_DIR)

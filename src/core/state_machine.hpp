@@ -33,10 +33,24 @@ public:
     }
 
     void change_state(GameStateId new_state, Game& game) {
-        if (current_) current_->exit(game);
+        if (current_) {
+            previous_ = current_->id();
+            current_->exit(game);
+        }
         current_ = states_.at(new_state).get();
         current_->enter(game);
     }
+
+    // Resume a state without calling enter() — used to unpause
+    void resume_state(GameStateId state, Game& game) {
+        if (current_) current_->exit(game);
+        current_ = states_.at(state).get();
+    }
+
+    GameStateId previous_id() const { return previous_; }
+
+    bool has_active_game() const { return has_active_game_; }
+    void set_active_game(bool v) { has_active_game_ = v; }
 
     void update(Game& game, float dt) {
         if (current_) current_->update(game, dt);
@@ -53,6 +67,8 @@ public:
 private:
     std::unordered_map<GameStateId, std::unique_ptr<IGameState>> states_;
     IGameState* current_{nullptr};
+    GameStateId previous_{GameStateId::Menu};
+    bool has_active_game_{false};
 };
 
 } // namespace ls

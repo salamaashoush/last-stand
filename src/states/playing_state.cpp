@@ -1,5 +1,7 @@
 #include "playing_state.hpp"
 #include "core/game.hpp"
+#include "core/asset_paths.hpp"
+#include "core/biome_theme.hpp"
 #include "systems/systems.hpp"
 #include "factory/hero_factory.hpp"
 #include "factory/tower_factory.hpp"
@@ -15,10 +17,15 @@ static void on_enemy_death(Game& g, const EnemyDeathEvent& evt) {
     if (g.difficulty == Difficulty::Easy) reward = static_cast<Gold>(reward * 1.2f);
     else if (g.difficulty == Difficulty::Hard) reward = static_cast<Gold>(reward * 0.8f);
 
-    g.play.gold += reward;
     g.play.total_kills++;
     g.play.stats.total_kills++;
-    g.play.stats.gold_earned += reward;
+
+    // Spawn coin pickup at death position
+    auto coin = g.registry.create();
+    g.registry.emplace<Transform>(coin, evt.position);
+    g.registry.emplace<Sprite>(coin, GOLD, 5, 20.0f, 20.0f, true, std::string(assets::COIN_SPRITE));
+    g.registry.emplace<Coin>(coin, reward, 0.0f, 24.0f);
+    g.registry.emplace<Lifetime>(coin, 15.0f); // coins disappear after 15 seconds
 
     auto heroes = g.registry.view<Hero>();
     for (auto [e, hero] : heroes.each()) {
@@ -84,6 +91,7 @@ void PlayingState::enter(Game& game) {
     game.play = PlayState{};
     game.registry.clear();
     game.recalculate_path();
+    game.state_machine.set_active_game(true);
 
     // Initialize sounds if not already done
     if (!game.sounds.initialized_) {
@@ -109,6 +117,13 @@ void PlayingState::enter(Game& game) {
     // Create hero at spawn
     auto spawn_world = game.current_map.grid_to_world(game.current_map.spawn);
     game.play.hero = create_hero(game.registry, spawn_world);
+
+    // Apply upgrade bonuses
+    if (game.upgrades.bonus_hp() > 0) {
+        auto& hp = game.registry.get<Health>(game.play.hero);
+        hp.max += game.upgrades.bonus_hp();
+        hp.current = hp.max;
+    }
 
     // Restore from save if available
     if (game.pending_load) {
@@ -138,7 +153,26 @@ void PlayingState::enter(Game& game) {
         game.play.tutorial.completed = true;
     }
 
+    // Initialize camera
+    game.camera.offset = {SCREEN_WIDTH / 2.0f, SCREEN_HEIGHT / 2.0f};
+    game.camera.target = {spawn_world.x, spawn_world.y};
+    game.camera.rotation = 0.0f;
+    game.camera.zoom = 1.0f;
+
+    // Generate decorations
+    game.current_map.generate_decorations();
+
     setup_event_handlers(game);
+
+    // Start gameplay music (biome-specific)
+    auto& theme = get_biome_theme(game.current_map.name);
+    Music* gameplay_music = game.assets.get_music(theme.music_track);
+    if (gameplay_music) {
+        if (game.current_music) StopMusicStream(*game.current_music);
+        PlayMusicStream(*gameplay_music);
+        SetMusicVolume(*gameplay_music, game.music_muted ? 0.0f : game.music_volume);
+        game.current_music = gameplay_music;
+    }
 }
 
 void PlayingState::exit(Game& game) {
@@ -179,6 +213,22 @@ void PlayingState::handle_input(Game& game) {
         }
     }
 
+    // Music controls
+    if (IsKeyPressed(KEY_M)) {
+        game.music_muted = !game.music_muted;
+        if (game.current_music) {
+            SetMusicVolume(*game.current_music, game.music_muted ? 0.0f : game.music_volume);
+        }
+    }
+    if (IsKeyPressed(KEY_EQUAL) || IsKeyPressed(KEY_KP_ADD)) {
+        game.music_volume = std::min(1.0f, game.music_volume + 0.1f);
+        if (game.current_music && !game.music_muted) SetMusicVolume(*game.current_music, game.music_volume);
+    }
+    if (IsKeyPressed(KEY_MINUS) || IsKeyPressed(KEY_KP_SUBTRACT)) {
+        game.music_volume = std::max(0.0f, game.music_volume - 0.1f);
+        if (game.current_music && !game.music_muted) SetMusicVolume(*game.current_music, game.music_volume);
+    }
+
     // Start wave early
     if (IsKeyPressed(KEY_SPACE) && !ps.wave_active && ps.current_wave < MAX_WAVES) {
         ps.wave_timer = 0.0f;
@@ -189,9 +239,10 @@ void PlayingState::handle_input(Game& game) {
         auto gp = game.mouse_grid();
         auto mp = GetMousePosition();
 
-        // Check if clicking on the right panel
+        // Check if clicking on the right panel or tower popover
         if (mp.x >= SCREEN_WIDTH - PANEL_WIDTH) return;
         if (mp.y < HUD_HEIGHT) return;
+        if (ps.popover_rect.width > 0 && CheckCollisionPointRec(mp, ps.popover_rect)) return;
 
         if (ps.placing_tower.has_value()) {
             // Place tower
@@ -312,6 +363,44 @@ void PlayingState::update(Game& game, float dt) {
         }
     }
 
+    // Update music stream
+    if (game.current_music) UpdateMusicStream(*game.current_music);
+
+    // Switch to boss music during boss waves (only if biome doesn't already use boss music)
+    {
+        auto& biome = get_biome_theme(game.current_map.name);
+        Music* biome_music = game.assets.get_music(biome.music_track);
+        Music* boss_music = game.assets.get_music(assets::MUSIC_BOSS);
+        bool is_boss_wave = game.play.wave_active && game.play.current_wave > 0
+            && (game.play.current_wave % BOSS_WAVE_INTERVAL == 0);
+        // Only switch to boss music if the biome's normal track is different from boss
+        if (biome_music != boss_music) {
+            if (is_boss_wave && boss_music && game.current_music != boss_music) {
+                if (game.current_music) StopMusicStream(*game.current_music);
+                PlayMusicStream(*boss_music);
+                SetMusicVolume(*boss_music, game.music_muted ? 0.0f : game.music_volume);
+                game.current_music = boss_music;
+            } else if (!is_boss_wave && biome_music && game.current_music != biome_music
+                       && game.current_music == boss_music) {
+                StopMusicStream(*boss_music);
+                PlayMusicStream(*biome_music);
+                SetMusicVolume(*biome_music, game.music_muted ? 0.0f : game.music_volume);
+                game.current_music = biome_music;
+            }
+        }
+    }
+
+    // Camera follow hero
+    if (game.play.hero != entt::null && game.registry.valid(game.play.hero)) {
+        auto& htf = game.registry.get<Transform>(game.play.hero);
+        float world_w = static_cast<float>(GRID_COLS * TILE_SIZE);
+        float world_h = static_cast<float>(GRID_ROWS * TILE_SIZE);
+        float half_w = SCREEN_WIDTH / 2.0f;
+        float half_h = SCREEN_HEIGHT / 2.0f;
+        game.camera.target.x = std::clamp(htf.position.x, half_w, world_w - half_w);
+        game.camera.target.y = std::clamp(htf.position.y, half_h, world_h - half_h);
+    }
+
     systems::hero_system(game, scaled_dt);
     systems::enemy_spawn_system(game, scaled_dt);
     systems::path_follow_system(game, scaled_dt);
@@ -329,23 +418,23 @@ void PlayingState::update(Game& game, float dt) {
     systems::collision_system(game, scaled_dt);
     systems::lifetime_system(game, scaled_dt);
     systems::particle_system(game, scaled_dt);
+    systems::coin_system(game, scaled_dt);
+    systems::animated_sprite_system(game, scaled_dt);
 }
 
 void PlayingState::render(Game& game) {
-    ClearBackground({20, 25, 20, 255});
+    ClearBackground(get_biome_theme(game.current_map.name).bg_color);
 
-    // Camera2D with shake offset for game world
-    Camera2D cam{};
-    cam.offset = {0, 0};
-    cam.target = {-game.play.shake_offset.x, -game.play.shake_offset.y};
-    cam.rotation = 0;
-    cam.zoom = 1.0f;
+    // Camera2D follows hero with shake offset
+    Camera2D cam = game.camera;
+    cam.target.x += game.play.shake_offset.x;
+    cam.target.y += game.play.shake_offset.y;
 
     BeginMode2D(cam);
     systems::render_system(game);
     EndMode2D();
 
-    // UI renders outside camera (unshaken)
+    // UI renders outside camera (screen space)
     systems::ui_system(game);
 }
 

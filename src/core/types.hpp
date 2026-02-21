@@ -88,7 +88,8 @@ enum class GameStateId : uint8_t {
     Playing,
     Paused,
     GameOver,
-    Victory
+    Victory,
+    Upgrades
 };
 
 enum class Difficulty : uint8_t {

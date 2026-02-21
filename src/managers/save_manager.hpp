@@ -6,6 +6,7 @@
 #include <entt/entt.hpp>
 #include "components/components.hpp"
 #include "core/types.hpp"
+#include "core/hero_upgrades.hpp"
 
 namespace ls {
 
@@ -80,6 +81,39 @@ public:
             return data;
         } catch (const std::exception& e) {
             return std::unexpected(std::string("Save parse error: ") + e.what());
+        }
+    }
+    std::expected<void, std::string> save_upgrades(const HeroUpgrades& u, const std::string& path) {
+        nlohmann::json j;
+        j["xp"] = u.upgrade_xp;
+        j["range"] = u.attack_range_level;
+        j["magnet"] = u.magnet_level;
+        j["damage"] = u.attack_damage_level;
+        j["speed"] = u.attack_speed_level;
+        j["hp"] = u.max_hp_level;
+        std::ofstream file(path);
+        if (!file.is_open())
+            return std::unexpected("Cannot write upgrades file: " + path);
+        file << j.dump(2);
+        return {};
+    }
+
+    HeroUpgrades load_upgrades(const std::string& path) {
+        std::ifstream file(path);
+        if (!file.is_open()) return {};
+        try {
+            nlohmann::json j;
+            file >> j;
+            HeroUpgrades u;
+            u.upgrade_xp = j.value("xp", 0);
+            u.attack_range_level = j.value("range", 0);
+            u.magnet_level = j.value("magnet", 0);
+            u.attack_damage_level = j.value("damage", 0);
+            u.attack_speed_level = j.value("speed", 0);
+            u.max_hp_level = j.value("hp", 0);
+            return u;
+        } catch (...) {
+            return {};
         }
     }
 };

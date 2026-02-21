@@ -56,7 +56,7 @@ inline entt::entity create_enemy(entt::registry& reg, EnemyType type, const std:
     reg.emplace<Sprite>(e, stats.color, 3, stats.size, stats.size, true);
     reg.emplace<Health>(e, stats.hp, stats.hp, stats.armor);
     reg.emplace<HealthBarComp>(e);
-    reg.emplace<Enemy>(e, type, stats.reward, stats.attack_damage, stats.attack_range, stats.attack_cooldown, 0.0f, stats.size * 0.5f);
+    reg.emplace<Enemy>(e, type, stats.reward, stats.attack_damage, stats.attack_range, stats.attack_cooldown, 0.0f, stats.size * 0.3f);
     reg.emplace<PathFollower>(e, path, size_t{0}, stats.speed, stats.speed);
 
     if (type == EnemyType::Flying) {

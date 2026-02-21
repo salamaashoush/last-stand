@@ -47,11 +47,11 @@ inline entt::entity create_floating_text(entt::registry& reg, Vec2 pos, const st
     return e;
 }
 
-inline entt::entity create_particle(entt::registry& reg, Vec2 pos, Vec2 vel, Color color, float size, float lifetime) {
+inline entt::entity create_particle(entt::registry& reg, Vec2 pos, Vec2 vel, Color color, float size, float lifetime, const std::string& texture = "") {
     auto e = reg.create();
     reg.emplace<Transform>(e, pos);
     reg.emplace<Velocity>(e, vel);
-    reg.emplace<Particle>(e, color, size, 1.0f);
+    reg.emplace<Particle>(e, color, size, 1.0f, texture);
     reg.emplace<Lifetime>(e, lifetime);
     return e;
 }

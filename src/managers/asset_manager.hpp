@@ -12,6 +12,7 @@ public:
         for (auto& [_, tex] : textures_) UnloadTexture(tex);
         for (auto& [_, snd] : sounds_) UnloadSound(snd);
         for (auto& [_, fnt] : fonts_) UnloadFont(fnt);
+        for (auto& [_, mus] : music_) UnloadMusicStream(mus);
     }
 
     std::expected<Texture2D, std::string> load_texture(const std::string& name, const std::string& path) {
@@ -44,6 +45,16 @@ public:
         return fnt;
     }
 
+    std::expected<Music, std::string> load_music(const std::string& name, const std::string& path) {
+        if (auto it = music_.find(name); it != music_.end())
+            return it->second;
+        if (!FileExists(path.c_str()))
+            return std::unexpected("Music not found: " + path);
+        auto mus = LoadMusicStream(path.c_str());
+        music_[name] = mus;
+        return mus;
+    }
+
     Texture2D* get_texture(const std::string& name) {
         auto it = textures_.find(name);
         return it != textures_.end() ? &it->second : nullptr;
@@ -59,10 +70,16 @@ public:
         return it != fonts_.end() ? &it->second : nullptr;
     }
 
+    Music* get_music(const std::string& name) {
+        auto it = music_.find(name);
+        return it != music_.end() ? &it->second : nullptr;
+    }
+
 private:
     std::unordered_map<std::string, Texture2D> textures_;
     std::unordered_map<std::string, Sound> sounds_;
     std::unordered_map<std::string, Font> fonts_;
+    std::unordered_map<std::string, Music> music_;
 };
 
 } // namespace ls

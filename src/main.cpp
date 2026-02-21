@@ -5,6 +5,7 @@
 #include "states/playing_state.hpp"
 #include "states/paused_state.hpp"
 #include "states/gameover_state.hpp"
+#include "states/upgrade_state.hpp"
 
 int main() {
     InitWindow(ls::SCREEN_WIDTH, ls::SCREEN_HEIGHT, "Last Stand - Tower Defense");
@@ -12,6 +13,7 @@ int main() {
     InitAudioDevice();
 
     ls::Game game;
+    ls::load_assets(game);
 
     // Register all states
     game.state_machine.register_state<ls::MenuState>();
@@ -20,7 +22,9 @@ int main() {
     game.state_machine.register_state<ls::PausedState>();
     game.state_machine.register_state<ls::GameOverState>();
     game.state_machine.register_state<ls::VictoryState>();
+    game.state_machine.register_state<ls::UpgradeState>();
 
+    game.upgrades = game.save_manager.load_upgrades("upgrades.json");
     game.state_machine.change_state(ls::GameStateId::Menu, game);
 
     while (!WindowShouldClose() && game.running) {
@@ -33,6 +37,7 @@ int main() {
         EndDrawing();
     }
 
+    if (game.current_music) StopMusicStream(*game.current_music);
     game.sounds.cleanup();
     CloseAudioDevice();
     CloseWindow();

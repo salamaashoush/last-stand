@@ -3,17 +3,15 @@
 
 namespace ls {
 
-class PausedState : public IGameState {
+class UpgradeState : public IGameState {
 public:
-    void enter(Game&) override { selected_ = 0; save_flash_ = 0; }
+    void enter(Game& game) override;
     void exit(Game&) override {}
-    GameStateId id() const override { return GameStateId::Paused; }
+    GameStateId id() const override { return GameStateId::Upgrades; }
     void update(Game& game, float dt) override;
     void render(Game& game) override;
-
 private:
     int selected_{0};
-    float save_flash_{0};
 };
 
 } // namespace ls

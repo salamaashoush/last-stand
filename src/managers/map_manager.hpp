@@ -6,8 +6,14 @@
 #include <nlohmann/json.hpp>
 #include "core/types.hpp"
 #include "core/constants.hpp"
+#include "core/biome_theme.hpp"
 
 namespace ls {
+
+struct Decoration {
+    GridPos pos;
+    int texture_index; // 0-6 maps to decoration texture array
+};
 
 struct MapData {
     std::string name;
@@ -15,6 +21,7 @@ struct MapData {
     int rows{GRID_ROWS};
     std::vector<std::vector<TileType>> tiles;
     std::vector<GridPos> path_waypoints;
+    std::vector<Decoration> decorations;
     GridPos spawn;
     GridPos exit_pos;
 
@@ -43,7 +50,56 @@ struct MapData {
 
     bool is_buildable(GridPos p) const {
         auto t = tile_at(p);
-        return t == TileType::Grass || t == TileType::Buildable;
+        return t == TileType::Buildable;
+    }
+
+    void generate_decorations() {
+        decorations.clear();
+        // Seed based on map name for consistent results
+        unsigned seed = 0;
+        for (auto c : name) seed = seed * 31 + static_cast<unsigned>(c);
+        std::srand(seed);
+
+        auto is_path_adjacent = [&](int x, int y) -> bool {
+            for (int dy = -1; dy <= 1; ++dy) {
+                for (int dx = -1; dx <= 1; ++dx) {
+                    if (dx == 0 && dy == 0) continue;
+                    GridPos np{x + dx, y + dy};
+                    if (in_bounds(np)) {
+                        auto t = tile_at(np);
+                        if (t == TileType::Path || t == TileType::Spawn || t == TileType::Exit)
+                            return true;
+                    }
+                }
+            }
+            return false;
+        };
+
+        auto& theme = get_biome_theme(name);
+
+        // Compute cumulative weights for weighted random selection
+        int total_weight = 0;
+        int cumulative[8];
+        for (int i = 0; i < 8; ++i) {
+            total_weight += theme.deco_weights[i];
+            cumulative[i] = total_weight;
+        }
+
+        for (int y = 0; y < rows; ++y) {
+            for (int x = 0; x < cols; ++x) {
+                if (tile_at({x, y}) != TileType::Grass) continue;
+                if (is_path_adjacent(x, y)) continue;
+                if ((std::rand() % 100) >= theme.deco_density) continue;
+                if (total_weight <= 0) continue;
+                // Weighted random decoration selection
+                int r = std::rand() % total_weight;
+                int tex_idx = 0;
+                for (int i = 0; i < 8; ++i) {
+                    if (r < cumulative[i]) { tex_idx = i; break; }
+                }
+                decorations.push_back({{x, y}, tex_idx});
+            }
+        }
     }
 };
 
