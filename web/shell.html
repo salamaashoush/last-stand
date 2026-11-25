@@ -117,26 +117,36 @@
         Module.setStatus('Downloading...');
         window.onerror = function() { Module.setStatus('Something went wrong. Reload to try again.'); };
 
-        // Browsers keep audio suspended until the first gesture; raylib's miniaudio contexts
-        // live in Module.miniaudio.
+        // miniaudio unlocks its AudioContext on the first touchend or click and then stops
+        // listening, but mobile browsers suspend the context again whenever the page loses
+        // the screen (app switch, lock, a call), so every later gesture has to retry. Only
+        // touchend, pointerup, click and keydown count as a gesture for touch; touchstart and
+        // pointerdown do not.
         function resumeAudio() {
-            if (typeof Module.miniaudio !== 'undefined') {
-                for (var i = 0; i < Module.miniaudio.devices.length; i++) {
-                    var d = Module.miniaudio.devices[i];
-                    if (d != null) d.webaudio.resume();
+            var ma = window.miniaudio;
+            if (!ma) return;
+            for (var i = 0; i < ma.devices.length; i++) {
+                var d = ma.devices[i];
+                if (d && d.webaudio && d.state === ma.device_state.started && d.webaudio.state !== 'running') {
+                    d.webaudio.resume().catch(function() {});
                 }
             }
         }
-        ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(function(e) {
-            document.addEventListener(e, resumeAudio);
+        ['touchend', 'pointerup', 'click', 'keydown'].forEach(function(e) {
+            document.addEventListener(e, resumeAudio, true);
+        });
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden) resumeAudio();
         });
         document.addEventListener('pointerdown', function() { Module.canvas.focus(); });
 
         // Phones get the whole screen: the first tap asks for fullscreen (Android Chrome and
-        // friends honour it) and locks portrait. iOS Safari ignores both; installing the page
-        // to the home screen gives it fullscreen through the manifest instead.
+        // iPad Safari honour it) and locks portrait where allowed. iPhone Safari has no element
+        // fullscreen; installing the page to the home screen gives it fullscreen through the
+        // manifest instead. A touch pointerdown carries no user activation, so this waits for
+        // pointerup.
         var askedFullscreen = false;
-        document.addEventListener('pointerdown', function() {
+        document.addEventListener('pointerup', function() {
             if (askedFullscreen || !window.matchMedia('(pointer: coarse)').matches) return;
             askedFullscreen = true;
             var el = document.documentElement;
