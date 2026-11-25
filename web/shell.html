@@ -122,21 +122,40 @@
         // the screen (app switch, lock, a call), so every later gesture has to retry. Only
         // touchend, pointerup, click and keydown count as a gesture for touch; touchstart and
         // pointerdown do not.
-        function resumeAudio() {
+        // Older iOS only unlocks a context once a source starts inside the gesture, so each
+        // resume also plays one silent frame.
+        function startedContexts() {
             var ma = window.miniaudio;
-            if (!ma) return;
-            for (var i = 0; i < ma.devices.length; i++) {
-                var d = ma.devices[i];
-                if (d && d.webaudio && d.state === ma.device_state.started && d.webaudio.state !== 'running') {
-                    d.webaudio.resume().catch(function() {});
-                }
-            }
+            if (!ma) return [];
+            return ma.devices.filter(function(d) {
+                return d && d.webaudio && d.state === ma.device_state.started;
+            }).map(function(d) { return d.webaudio; });
+        }
+        function resumeAudio() {
+            startedContexts().forEach(function(ctx) {
+                if (ctx.state === 'running') return;
+                ctx.resume().catch(function() {});
+                var src = ctx.createBufferSource();
+                src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate);
+                src.connect(ctx.destination);
+                src.start(0);
+            });
         }
         ['touchend', 'pointerup', 'click', 'keydown'].forEach(function(e) {
             document.addEventListener(e, resumeAudio, true);
         });
+
+        // iOS plays Web Audio through the ambient session, which Silent Mode mutes, so iPhones
+        // and iPads in Silent Mode heard nothing. The playback session ignores Silent Mode but
+        // would keep the game audible behind other apps, so the context is suspended while the
+        // page is hidden.
+        if (navigator.audioSession) navigator.audioSession.type = 'playback';
         document.addEventListener('visibilitychange', function() {
-            if (!document.hidden) resumeAudio();
+            if (document.hidden) {
+                startedContexts().forEach(function(ctx) { ctx.suspend().catch(function() {}); });
+            } else {
+                resumeAudio();
+            }
         });
         document.addEventListener('pointerdown', function() { Module.canvas.focus(); });
 
