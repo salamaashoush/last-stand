@@ -2,36 +2,28 @@
 
 namespace ls {
 
-inline constexpr int SCREEN_WIDTH = 1280;
-inline constexpr int SCREEN_HEIGHT = 720;
+// Everything renders into a fixed portrait canvas that is letterboxed into the window,
+// so phones, desktop windows and the browser all see the same playfield.
+inline constexpr int VIRTUAL_W = 720;
+inline constexpr int VIRTUAL_H = 1280;
 inline constexpr int TARGET_FPS = 60;
 
-inline constexpr int TILE_SIZE = 48;
-inline constexpr int GRID_OFFSET_X = 0;
-inline constexpr int GRID_OFFSET_Y = 0;
-inline constexpr int GRID_COLS = 48;
-inline constexpr int GRID_ROWS = 24;
+inline constexpr float HUD_TOP = 96.0f;
+inline constexpr float SPAWN_Y = 40.0f;
+inline constexpr float WALL_TOP = 990.0f;
+inline constexpr float WALL_BOTTOM = 1066.0f;
+inline constexpr float SQUAD_Y = 1104.0f;
+inline constexpr float PANEL_TOP = 1180.0f;
 
-inline constexpr int STARTING_GOLD = 0;
-inline constexpr int STARTING_LIVES = 20;
-inline constexpr int MAX_WAVES = 30;
-inline constexpr int BOSS_WAVE_INTERVAL = 5;
+inline constexpr float GATE_W = 172.0f;
+inline constexpr float GATE_H = 64.0f;
+inline constexpr float GATE_SPEED = 72.0f;
 
-inline constexpr float HERO_SPEED = 280.0f;
-inline constexpr float HERO_ATTACK_RANGE = 140.0f;
-inline constexpr float HERO_ATTACK_COOLDOWN = 0.3f;
-inline constexpr int HERO_BASE_DAMAGE = 15;
-inline constexpr int HERO_BASE_HP = 200;
-inline constexpr int HERO_XP_PER_LEVEL = 100;
+inline constexpr float BULLET_SPEED = 1150.0f;
+inline constexpr float BULLET_RADIUS = 5.0f;
 
-inline constexpr float PROJECTILE_SPEED = 500.0f;
-inline constexpr float FLOATING_TEXT_DURATION = 1.0f;
-inline constexpr float FLOATING_TEXT_SPEED = 40.0f;
-
-inline constexpr int HUD_HEIGHT = 48;
-inline constexpr int PANEL_WIDTH = 220;
-
-inline constexpr float WAVE_DELAY = 2.0f;
-inline constexpr float SPAWN_INTERVAL = 0.35f;
+inline constexpr int TURRET_SLOTS = 4;
+inline constexpr float TURRET_Y = 1018.0f;
+inline constexpr float TURRET_SLOT_X[TURRET_SLOTS] = {78.0f, 248.0f, 472.0f, 642.0f};
 
 } // namespace ls

@@ -2,8 +2,9 @@ build/
 build-test/
 build-web/
 .cache/
+.ferridriver/
 compile_commands.json
-save.json
+laststand_save.json
 *.swp
 *.swo
 *~

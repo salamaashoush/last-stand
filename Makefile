@@ -1,11 +1,12 @@
 BUILD_DIR := build
 BUILD_TYPE ?= Debug
 BINARY := $(BUILD_DIR)/LastStand
-JOBS := $(shell nproc)
+JOBS := $(shell nproc 2>/dev/null || sysctl -n hw.ncpu)
 
 WEB_BUILD_DIR := build-web
 TEST_BUILD_DIR := build-test
-EMSDK_ENV := source $(HOME)/emsdk/emsdk_env.sh > /dev/null 2>&1
+EMSDK ?= $(HOME)/emsdk
+EMSDK_ENV := . $(EMSDK)/emsdk_env.sh > /dev/null 2>&1
 
 .PHONY: all configure build run clean rebuild release debug web-configure web web-serve test format format-check tidy
 
@@ -36,6 +37,7 @@ web-configure:
 
 web: web-configure
 	$(EMSDK_ENV) && cmake --build $(WEB_BUILD_DIR) -j$(JOBS)
+	cp $(WEB_BUILD_DIR)/LastStand.html $(WEB_BUILD_DIR)/index.html
 
 web-serve: web
 	miniserve $(WEB_BUILD_DIR) --index LastStand.html -p 8080

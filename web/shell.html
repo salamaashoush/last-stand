@@ -2,113 +2,94 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Last Stand - Tower Defense</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#06060c">
+    <title>Last Stand - Horde Defense</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-            background: #1a1a2e;
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #06060c;
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+        }
+        canvas {
+            display: block;
+            width: 100vw;
+            height: 100vh;
+            outline: none;
+        }
+        #loading {
+            position: fixed;
+            inset: 0;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
+            gap: 18px;
+            background: #06060c;
+            color: #ffcd3c;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            color: #e0e0e0;
+            font-weight: 800;
+            letter-spacing: 2px;
         }
-        h1 {
-            margin-bottom: 16px;
-            font-size: 1.5rem;
-            color: #e0e0e0;
-        }
-        #canvas-container {
-            border: 2px solid #333;
-            border-radius: 4px;
-            overflow: hidden;
-        }
-        canvas { display: block; }
-        #loading {
-            margin-top: 20px;
-            text-align: center;
-        }
-        #loading .spinner {
-            font-size: 0.9rem;
-            color: #aaa;
-        }
+        #loading h1 { font-size: 2.4rem; text-shadow: 0 4px 0 #3a2000; }
         #progress-bar {
-            width: 300px;
-            height: 8px;
-            background: #333;
-            border-radius: 4px;
-            margin-top: 8px;
+            width: 240px;
+            height: 10px;
+            background: #222;
+            border-radius: 5px;
             overflow: hidden;
         }
-        #progress-bar #progress {
-            width: 0%;
-            height: 100%;
-            background: #4a9eff;
-            transition: width 0.2s;
-        }
+        #progress { width: 0%; height: 100%; background: #ffcd3c; transition: width 0.2s; }
+        #status { color: #aaa; font-size: 0.8rem; font-weight: 600; }
     </style>
 </head>
 <body>
-    <h1>Last Stand</h1>
-    <div id="canvas-container">
-        <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
-    </div>
+    <canvas id="canvas" oncontextmenu="event.preventDefault()" tabindex="-1"></canvas>
     <div id="loading">
-        <div class="spinner" id="status">Downloading...</div>
+        <h1>LAST STAND</h1>
         <div id="progress-bar"><div id="progress"></div></div>
+        <div id="status">Loading...</div>
     </div>
-
     <script>
         var Module = {
             canvas: (function() { return document.getElementById('canvas'); })(),
             setStatus: function(text) {
-                var statusEl = document.getElementById('status');
-                var progressEl = document.getElementById('progress');
-                var loadingEl = document.getElementById('loading');
-                if (!text) {
-                    loadingEl.style.display = 'none';
-                    return;
-                }
-                statusEl.textContent = text;
+                var loading = document.getElementById('loading');
+                if (!text) { loading.style.display = 'none'; return; }
+                document.getElementById('status').textContent = text.replace(/\(.*\)/, '');
                 var m = text.match(/([^(]+)\((\d+(\.\d+)?)\/(\d+)\)/);
-                if (m) {
-                    var pct = (parseInt(m[2]) / parseInt(m[4])) * 100;
-                    progressEl.style.width = pct + '%';
-                }
+                if (m) document.getElementById('progress').style.width = (parseInt(m[2]) / parseInt(m[4])) * 100 + '%';
             },
             totalDependencies: 0,
             monitorRunDependencies: function(left) {
                 this.totalDependencies = Math.max(this.totalDependencies, left);
-                Module.setStatus(left
-                    ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')'
-                    : 'All downloads complete.');
+                Module.setStatus(left ? 'Preparing... (' + (this.totalDependencies - left) + '/' + this.totalDependencies + ')' : '');
             }
         };
         Module.setStatus('Downloading...');
-        window.onerror = function() {
-            Module.setStatus('Error! See browser console for details.');
-        };
+        window.onerror = function() { Module.setStatus('Something went wrong. Reload to try again.'); };
 
-        // Resume AudioContext on first user interaction (browser autoplay policy).
-        // Raylib uses miniaudio which stores its Web Audio contexts in Module.miniaudio.
+        // Browsers keep audio suspended until the first gesture; raylib's miniaudio contexts
+        // live in Module.miniaudio.
         function resumeAudio() {
-            if (typeof Module !== 'undefined' && typeof Module.miniaudio !== 'undefined') {
+            if (typeof Module.miniaudio !== 'undefined') {
                 for (var i = 0; i < Module.miniaudio.devices.length; i++) {
-                    if (Module.miniaudio.devices[i] != null) {
-                        Module.miniaudio.devices[i].webaudio.resume();
-                    }
+                    var d = Module.miniaudio.devices[i];
+                    if (d != null) d.webaudio.resume();
                 }
             }
-            document.removeEventListener('click', resumeAudio);
-            document.removeEventListener('keydown', resumeAudio);
-            document.removeEventListener('touchstart', resumeAudio);
         }
-        document.addEventListener('click', resumeAudio);
-        document.addEventListener('keydown', resumeAudio);
-        document.addEventListener('touchstart', resumeAudio);
+        ['click', 'keydown', 'touchstart', 'pointerdown'].forEach(function(e) {
+            document.addEventListener(e, resumeAudio);
+        });
+        document.addEventListener('pointerdown', function() { Module.canvas.focus(); });
     </script>
     {{{ SCRIPT }}}
 </body>
