@@ -8,6 +8,7 @@
 #include <array>
 #include <cmath>
 #include <format>
+#include <functional>
 #include <rlgl.h>
 #include <vector>
 
@@ -1467,6 +1468,295 @@ void draw_ambient(Game& game, const Theme& th, float time) {
     }
 }
 
+// Props scattered over the battleground, by biome. Each is drawn top-down-ish with a soft
+// shadow so it sits on the ground the horde walks over.
+void prop_shadow(const Gfx& g, Vec2 at, float rx) {
+    ellipse(g, at + Vec2{rx * 0.15f, rx * 0.35f}, rx, rx * 0.4f, Color{0, 0, 0, 60});
+}
+
+void prop_flowers(const Gfx& g, Vec2 at, Rng& rng) {
+    static const Color petals[] = {
+        {240, 120, 160, 255}, {255, 220, 90, 255}, {200, 140, 255, 255}, {255, 255, 255, 255}};
+    for (int i = 0; i < 7; ++i) {
+        Vec2 q = at + Vec2{rng.uniform(-22, 22), rng.uniform(-12, 12)};
+        Color c = petals[rng.range(0, 3)];
+        for (int k = 0; k < 4; ++k) disc(g, q + Vec2{std::cos(k * 1.57f), std::sin(k * 1.57f)} * 2.6f, 2.4f, c);
+        disc(g, q, 1.8f, Color{255, 200, 60, 255});
+    }
+}
+
+void prop_mushrooms(const Gfx& g, Vec2 at, Rng& rng) {
+    int n = rng.range(2, 4);
+    for (int i = 0; i < n; ++i) {
+        Vec2 q = at + Vec2{rng.uniform(-14, 14), rng.uniform(-6, 6)};
+        float r = rng.uniform(5, 9);
+        prop_shadow(g, q, r);
+        DrawRectangleRounded({q.x - r * 0.25f, q.y - r * 0.2f, r * 0.5f, r * 0.9f}, 0.5f, 4, Color{240, 230, 210, 255});
+        ellipse(g, q - Vec2{0, r * 0.3f}, r + 1.5f, r * 0.62f + 1.5f, Color{90, 20, 20, 255});
+        ellipse(g, q - Vec2{0, r * 0.3f}, r, r * 0.62f, Color{210, 50, 50, 255});
+        disc(g, q + Vec2{-r * 0.35f, -r * 0.45f}, r * 0.16f, WHITE);
+        disc(g, q + Vec2{r * 0.3f, -r * 0.3f}, r * 0.12f, WHITE);
+    }
+}
+
+void prop_log(const Gfx& g, Vec2 at, Rng& rng) {
+    float len = rng.uniform(46, 70);
+    float ang = rng.uniform(-0.5f, 0.5f);
+    Vec2 d{std::cos(ang), std::sin(ang)};
+    Vec2 a = at - d * len * 0.5f;
+    Vec2 b = at + d * len * 0.5f;
+    prop_shadow(g, at, len * 0.5f);
+    line(a, b, 18, Color{60, 38, 22, 255});
+    line(a, b, 14, Color{128, 84, 48, 255});
+    line(a + Vec2{0, -3}, b + Vec2{0, -3}, 3, Color{160, 112, 70, 255});
+    disc(g, b, 8.5f, Color{60, 38, 22, 255});
+    disc(g, b, 7, Color{200, 160, 110, 255});
+    ring(g, b, 4.5f, Color{150, 110, 70, 255});
+    ellipse(g, at + d * 6.0f + Vec2{0, -4}, 7, 3, Color{80, 150, 60, 255});
+}
+
+void prop_gravestone(const Gfx& g, Vec2 at, Rng& rng) {
+    float w = rng.uniform(16, 22);
+    float h = w * 1.3f;
+    float tilt = rng.uniform(-12, 12);
+    prop_shadow(g, at, w * 0.8f);
+    DrawRectanglePro({at.x, at.y, w + 4, h + 4}, {(w + 4) / 2, h + 2}, tilt, Color{50, 52, 58, 255});
+    DrawRectanglePro({at.x, at.y, w, h}, {w / 2, h}, tilt, Color{146, 150, 160, 255});
+    DrawCircleV({at.x + std::sin(tilt * DEG2RAD) * h, at.y - std::cos(tilt * DEG2RAD) * h}, w / 2,
+                Color{146, 150, 160, 255});
+    DrawRectanglePro({at.x, at.y, w * 0.12f, h * 0.55f}, {w * 0.06f, h * 0.8f}, tilt, Color{90, 94, 104, 255});
+    DrawRectanglePro({at.x, at.y, w * 0.5f, w * 0.12f}, {w * 0.25f, h * 0.65f}, tilt, Color{90, 94, 104, 255});
+    ellipse(g, at + Vec2{0, 3}, w * 0.7f, 4, Color{90, 70, 50, 200});
+}
+
+void prop_cactus(const Gfx& g, Vec2 at, Rng& rng) {
+    float h = rng.uniform(34, 56);
+    Color green{74, 140, 76, 255};
+    Color dark{36, 80, 42, 255};
+    prop_shadow(g, at, 14);
+    auto stalk = [&](Vec2 base, Vec2 top, float w) {
+        line(base, top, w + 4, dark);
+        line(base, top, w, green);
+        disc(g, top, w * 0.5f + 2, dark);
+        disc(g, top, w * 0.5f, green);
+        line(base + Vec2{-w * 0.2f, 0}, top + Vec2{-w * 0.2f, 0}, 2, brighten(green, 0.25f));
+    };
+    stalk(at, at - Vec2{0, h}, 13);
+    float arm = rng.uniform(0.35f, 0.6f);
+    stalk(at - Vec2{0, h * arm}, at - Vec2{16, h * arm}, 8);
+    stalk(at - Vec2{16, h * arm}, at - Vec2{16, h * (arm + 0.3f)}, 8);
+    if (rng.chance(0.6f)) {
+        stalk(at - Vec2{0, h * (arm + 0.15f)}, at - Vec2{-14, h * (arm + 0.15f)}, 7);
+        stalk(at - Vec2{-14, h * (arm + 0.15f)}, at - Vec2{-14, h * (arm + 0.38f)}, 7);
+    }
+    if (rng.chance(0.5f)) disc(g, at - Vec2{0, h + 4}, 4, Color{255, 120, 160, 255});
+}
+
+void prop_beast_skull(const Gfx& g, Vec2 at, Rng&) {
+    Color bone{236, 226, 200, 255};
+    Color dark{90, 80, 66, 255};
+    prop_shadow(g, at, 22);
+    for (int side = -1; side <= 1; side += 2) {
+        float sx = static_cast<float>(side);
+        for (int i = 0; i <= 8; ++i) {
+            float t = static_cast<float>(i) / 8.0f;
+            Vec2 q = at + Vec2{sx * (10 + 26 * t), -6 - 14 * t * t};
+            disc(g, q, 5.0f * (1.0f - 0.7f * t) + 1.5f, dark);
+        }
+        for (int i = 0; i <= 8; ++i) {
+            float t = static_cast<float>(i) / 8.0f;
+            disc(g, at + Vec2{sx * (10 + 26 * t), -6 - 14 * t * t}, 5.0f * (1.0f - 0.7f * t), bone);
+        }
+    }
+    ellipse(g, at, 15, 12, dark);
+    ellipse(g, at, 13.5f, 10.5f, bone);
+    DrawRectangleRounded({at.x - 7, at.y + 2, 14, 16}, 0.6f, 4, bone);
+    disc(g, at + Vec2{-5, -1}, 3.5f, Color{40, 30, 26, 255});
+    disc(g, at + Vec2{5, -1}, 3.5f, Color{40, 30, 26, 255});
+    disc(g, at + Vec2{-2, 13}, 1.5f, Color{40, 30, 26, 255});
+    disc(g, at + Vec2{2, 13}, 1.5f, Color{40, 30, 26, 255});
+}
+
+void prop_pine(const Gfx& g, Vec2 at, Rng& rng, bool snowy) {
+    float s = rng.uniform(0.8f, 1.2f);
+    Color dark{30, 70, 52, 255};
+    Color mid{46, 104, 72, 255};
+    ellipse(g, at + Vec2{12 * s, 10 * s}, 30 * s, 12 * s, Color{0, 0, 0, 60});
+    for (int tier = 0; tier < 3; ++tier) {
+        float r = (30.0f - static_cast<float>(tier) * 8.0f) * s;
+        Vec2 c = at - Vec2{0, static_cast<float>(tier) * 6.0f * s};
+        DrawPoly(c.to_raylib(), 7, r + 2, rng.uniform(0, 50), dark);
+        DrawPoly(c.to_raylib(), 7, r, rng.uniform(0, 50), mid);
+        if (snowy) {
+            DrawPoly((c - Vec2{r * 0.18f, r * 0.2f}).to_raylib(), 7, r * 0.62f, rng.uniform(0, 50),
+                     Color{240, 246, 255, 255});
+        } else {
+            DrawPoly((c - Vec2{r * 0.2f, r * 0.2f}).to_raylib(), 7, r * 0.45f, rng.uniform(0, 50),
+                     brighten(mid, 0.15f));
+        }
+    }
+}
+
+void prop_frozen_pond(const Gfx& g, Vec2 at, Rng& rng) {
+    float rx = rng.uniform(40, 64);
+    ellipse(g, at, rx + 5, rx * 0.5f + 4, Color{200, 214, 230, 255});
+    ellipse(g, at, rx, rx * 0.5f, Color{150, 200, 236, 255});
+    ellipse(g, at - Vec2{rx * 0.2f, rx * 0.1f}, rx * 0.6f, rx * 0.22f, Color{196, 228, 250, 255});
+    for (int k = 0; k < 4; ++k) {
+        Vec2 p = at + Vec2{rng.uniform(-rx, rx) * 0.6f, rng.uniform(-rx, rx) * 0.2f};
+        for (int sgm = 0; sgm < 3; ++sgm) {
+            Vec2 q = p + Vec2{rng.uniform(-14, 14), rng.uniform(-6, 6)};
+            line(p, q, 1.5f, Color{255, 255, 255, 200});
+            p = q;
+        }
+    }
+}
+
+void prop_snowman(const Gfx& g, Vec2 at, Rng&) {
+    prop_shadow(g, at, 16);
+    disc(g, at, 15, Color{180, 196, 216, 255});
+    disc(g, at, 13.5f, Color{248, 250, 255, 255});
+    disc(g, at - Vec2{0, 18}, 10.5f, Color{180, 196, 216, 255});
+    disc(g, at - Vec2{0, 18}, 9.5f, Color{248, 250, 255, 255});
+    disc(g, at - Vec2{3, 20}, 1.6f, Color{30, 30, 30, 255});
+    disc(g, at - Vec2{-3, 20}, 1.6f, Color{30, 30, 30, 255});
+    tri(at - Vec2{0, 17}, at - Vec2{-1, 15.5f}, at - Vec2{-9, 16}, Color{255, 140, 40, 255});
+    line(at - Vec2{10, 10}, at - Vec2{18, 4}, 2, Color{90, 60, 30, 255});
+    line(at - Vec2{-10, 10}, at - Vec2{-18, 4}, 2, Color{90, 60, 30, 255});
+    DrawRectangleRec({at.x - 8, at.y - 13, 16, 4}, Color{200, 40, 40, 255});
+}
+
+void prop_dead_tree(const Gfx& g, Vec2 at, Rng& rng) {
+    Color bark{40, 32, 30, 255};
+    prop_shadow(g, at, 24);
+    std::function<void(Vec2, float, float, int)> branch = [&](Vec2 from, float ang, float len, int depth) {
+        Vec2 to = from + Vec2{std::cos(ang), std::sin(ang)} * len;
+        line(from, to, static_cast<float>(depth) * 2.0f + 1.0f, bark);
+        if (depth <= 0) return;
+        branch(to, ang - rng.uniform(0.3f, 0.7f), len * 0.68f, depth - 1);
+        branch(to, ang + rng.uniform(0.3f, 0.7f), len * 0.68f, depth - 1);
+    };
+    disc(g, at, 7, bark);
+    branch(at, -PI / 2 + rng.uniform(-0.3f, 0.3f), rng.uniform(22, 30), 3);
+}
+
+void prop_vent(const Gfx& g, Vec2 at, Rng&) {
+    DrawPoly((at + Vec2{2, 4}).to_raylib(), 7, 18, 10, Color{0, 0, 0, 70});
+    DrawPoly(at.to_raylib(), 7, 18, 10, Color{46, 36, 34, 255});
+    DrawPoly(at.to_raylib(), 7, 12, 30, Color{70, 56, 50, 255});
+    disc(g, at, 7, Color{30, 10, 6, 255});
+}
+
+void prop_ruin_pillar(const Gfx& g, Vec2 at, Rng& rng, Color stone) {
+    float h = rng.uniform(26, 48);
+    prop_shadow(g, at, 16);
+    DrawRectangleRec({at.x - 11, at.y - h, 22, h}, darken(stone, 0.45f));
+    DrawRectangleRec({at.x - 9, at.y - h, 18, h}, stone);
+    DrawRectangleRec({at.x - 9, at.y - h, 6, h}, brighten(stone, 0.12f));
+    for (float y = at.y - h + 8; y < at.y; y += 10) DrawLineEx({at.x - 9, y}, {at.x + 9, y}, 1.5f, darken(stone, 0.3f));
+    ellipse(g, {at.x, at.y - h}, 13, 5, brighten(stone, 0.2f));
+    for (int k = 0; k < 3; ++k) {
+        Vec2 q = at + Vec2{rng.uniform(-24, 24), rng.uniform(0, 8)};
+        DrawPoly(q.to_raylib(), 5, rng.uniform(3, 6), rng.uniform(0, 60), darken(stone, 0.2f));
+    }
+}
+
+enum class Prop : uint8_t {
+    Flowers,
+    Mushrooms,
+    Log,
+    Grave,
+    Pillar,
+    Cactus,
+    Skull,
+    Pine,
+    Pond,
+    Snowman,
+    DeadTree,
+    Vent
+};
+
+struct FieldProp {
+    Vec2 at;
+    Prop kind;
+};
+
+std::vector<FieldProp> field_props(const Theme& th) {
+    Rng rng{static_cast<uint64_t>(th.key * 7919 + 5)};
+    std::vector<FieldProp> out;
+    for (int i = 0; i < 10; ++i) {
+        float x = (i % 2 == 0) ? rng.uniform(50, 230) : rng.uniform(490, 670);
+        Vec2 at{x, rng.uniform(HUD_TOP + 60, WALL_TOP - 90)};
+        int roll = rng.range(0, 99);
+        Prop kind;
+        switch (th.biome) {
+        case 0:
+            kind = roll < 30   ? Prop::Flowers
+                   : roll < 50 ? Prop::Mushrooms
+                   : roll < 70 ? Prop::Log
+                   : roll < 85 ? Prop::Grave
+                               : Prop::Pillar;
+            break;
+        case 1:
+            kind = roll < 40 ? Prop::Cactus : roll < 65 ? Prop::Skull : Prop::Pillar;
+            break;
+        case 2:
+            kind = roll < 45 ? Prop::Pine : roll < 70 ? Prop::Pond : roll < 82 ? Prop::Snowman : Prop::Pillar;
+            break;
+        default:
+            kind = roll < 40 ? Prop::DeadTree : roll < 70 ? Prop::Vent : Prop::Skull;
+            break;
+        }
+        out.push_back({at, kind});
+    }
+    return out;
+}
+
+void draw_field_prop(Game& game, const Theme& th, const FieldProp& fp, Rng& rng) {
+    const auto& g = game.gfx;
+    Color pillar_stone = th.biome == 1   ? Color{204, 176, 128, 255}
+                         : th.biome == 2 ? Color{176, 190, 210, 255}
+                                         : th.stone;
+    switch (fp.kind) {
+    case Prop::Flowers:
+        prop_flowers(g, fp.at, rng);
+        break;
+    case Prop::Mushrooms:
+        prop_mushrooms(g, fp.at, rng);
+        break;
+    case Prop::Log:
+        prop_log(g, fp.at, rng);
+        break;
+    case Prop::Grave:
+        prop_gravestone(g, fp.at, rng);
+        break;
+    case Prop::Pillar:
+        prop_ruin_pillar(g, fp.at, rng, pillar_stone);
+        break;
+    case Prop::Cactus:
+        prop_cactus(g, fp.at, rng);
+        break;
+    case Prop::Skull:
+        prop_beast_skull(g, fp.at, rng);
+        break;
+    case Prop::Pine:
+        prop_pine(g, fp.at, rng, th.biome == 2);
+        break;
+    case Prop::Pond:
+        prop_frozen_pond(g, fp.at, rng);
+        break;
+    case Prop::Snowman:
+        prop_snowman(g, fp.at, rng);
+        break;
+    case Prop::DeadTree:
+        prop_dead_tree(g, fp.at, rng);
+        break;
+    case Prop::Vent:
+        prop_vent(g, fp.at, rng);
+        break;
+    }
+}
+
 void draw_decor(Game& game, const Theme& th, Vec2 at, Rng& rng) {
     const auto& g = game.gfx;
     switch (th.decor) {
@@ -1630,6 +1920,8 @@ void build_ground(Game& game, const Theme& th) {
         float y = rng.uniform(HUD_TOP + 20, WALL_TOP - 70);
         draw_decor(game, th, {x, y}, rng);
     }
+    Rng prop_rng{static_cast<uint64_t>(th.key * 31 + 9)};
+    for (const auto& fp : field_props(th)) draw_field_prop(game, th, fp, prop_rng);
     EndTextureMode();
 }
 
@@ -1677,9 +1969,118 @@ void unload_ground() {
     }
 }
 
+// Effects that move every frame on top of the baked ground.
+void draw_live_env(Game& game, const Theme& th, float time) {
+    const auto& g = game.gfx;
+    if (th.night <= 0.0f && th.biome != 3) {
+        for (int i = 0; i < 3; ++i) {
+            float fi = static_cast<float>(i);
+            float x = std::fmod(fi * 310.0f + time * (14.0f + fi * 4.0f), VIRTUAL_W + 600.0f) - 300.0f;
+            float y = 220.0f + fi * 260.0f + std::sin(time * 0.1f + fi) * 40.0f;
+            glow(g, {x, y}, 240.0f, Color{0, 0, 0, 34});
+            glow(g, {x + 120.0f, y + 30.0f}, 180.0f, Color{0, 0, 0, 28});
+        }
+    }
+    for (const auto& fp : field_props(th)) {
+        if (fp.kind == Prop::Vent) {
+            for (int k = 0; k < 5; ++k) {
+                float ph = std::fmod(time * 0.45f + static_cast<float>(k) * 0.2f + fp.at.x * 0.001f, 1.0f);
+                Vec2 q = fp.at + Vec2{std::sin(ph * 6.0f + static_cast<float>(k)) * 8.0f, -ph * 120.0f};
+                disc(g, q, 8.0f + ph * 26.0f, Color{70, 64, 62, static_cast<unsigned char>(130 * (1.0f - ph))});
+            }
+            BeginBlendMode(BLEND_ADDITIVE);
+            glow(g, fp.at, 22.0f + 4.0f * std::sin(time * 5.0f + fp.at.x), Color{255, 110, 40, 150});
+            EndBlendMode();
+        } else if (fp.kind == Prop::Pond) {
+            BeginBlendMode(BLEND_ADDITIVE);
+            for (int k = 0; k < 3; ++k) {
+                float tw = std::max(0.0f, std::sin(time * 2.3f + static_cast<float>(k) * 2.1f + fp.at.y));
+                Vec2 q = fp.at + Vec2{static_cast<float>(k - 1) * 22.0f, static_cast<float>(k % 2) * 6.0f - 4.0f};
+                line(q - Vec2{6 * tw, 0}, q + Vec2{6 * tw, 0}, 1.5f,
+                     Color{255, 255, 255, static_cast<unsigned char>(220 * tw)});
+                line(q - Vec2{0, 6 * tw}, q + Vec2{0, 6 * tw}, 1.5f,
+                     Color{255, 255, 255, static_cast<unsigned char>(220 * tw)});
+            }
+            EndBlendMode();
+        } else if (fp.kind == Prop::Flowers && th.night <= 0.0f) {
+            float a = time * 1.6f + fp.at.x;
+            Vec2 q = fp.at + Vec2{std::cos(a) * 26.0f, std::sin(a * 1.3f) * 14.0f - 18.0f};
+            float flap = std::abs(std::sin(time * 18.0f + fp.at.y));
+            ellipse(g, q - Vec2{3 * flap, 0}, 3.0f * flap + 0.5f, 3.0f, Color{255, 170, 60, 230});
+            ellipse(g, q + Vec2{3 * flap, 0}, 3.0f * flap + 0.5f, 3.0f, Color{255, 170, 60, 230});
+        }
+    }
+    if (th.biome == 3) {
+        Rng lava{static_cast<uint64_t>(th.key * 13 + 1)};
+        BeginBlendMode(BLEND_ADDITIVE);
+        for (int i = 0; i < 6; ++i) {
+            Vec2 p{lava.uniform(40, VIRTUAL_W - 40), lava.uniform(HUD_TOP + 40, WALL_TOP - 60)};
+            float k = 0.5f + 0.5f * std::sin(time * 1.8f + static_cast<float>(i) * 1.3f);
+            glow(g, p, 50.0f + 20.0f * k, Color{255, 90, 30, static_cast<unsigned char>(30 + 50 * k)});
+        }
+        EndBlendMode();
+    }
+    if (th.biome == 1) {
+        for (int i = 0; i < 2; ++i) {
+            float fi = static_cast<float>(i);
+            float speed = 70.0f + fi * 30.0f;
+            float x = std::fmod(time * speed + fi * 400.0f, VIRTUAL_W + 200.0f) - 100.0f;
+            float y = 300.0f + fi * 330.0f + std::abs(std::sin(time * 3.0f + fi)) * -18.0f;
+            float rot = time * speed * 2.0f;
+            ellipse(g, {x, 300.0f + fi * 330.0f + 16.0f}, 16, 5, Color{0, 0, 0, 50});
+            disc(g, {x, y}, 15, Color{120, 90, 50, 200});
+            for (int k = 0; k < 6; ++k) {
+                float a = rot * DEG2RAD + static_cast<float>(k) * 1.05f;
+                line({x, y}, Vec2{x, y} + Vec2{std::cos(a), std::sin(a)} * 14.0f, 2.0f, Color{80, 56, 30, 220});
+            }
+            ring(g, {x, y}, 13, Color{90, 64, 34, 220});
+        }
+        float dx = 360.0f + std::sin(time * 0.2f) * 240.0f;
+        float dy = 520.0f + std::cos(time * 0.13f) * 160.0f;
+        for (int k = 0; k < 26; ++k) {
+            float fk = static_cast<float>(k);
+            float a = time * 6.0f + fk * 0.9f;
+            float rise = std::fmod(fk * 9.0f + time * 40.0f, 110.0f);
+            float rad = 6.0f + rise * 0.35f;
+            disc(g, {dx + std::cos(a) * rad, dy - rise + std::sin(a) * rad * 0.3f}, 2.5f,
+                 Color{220, 190, 140, static_cast<unsigned char>(170 * (1.0f - rise / 110.0f))});
+        }
+    }
+}
+
+// Night battlegrounds are lit by torches on the wall and the muzzle glow of the squad.
+void draw_night_lights(Game& game, const Run& run) {
+    const Theme& th = run.theme;
+    if (th.night <= 0.0f && th.biome != 3) return;
+    const auto& g = game.gfx;
+    float strength = th.night > 0.0f ? 1.0f : 0.5f;
+    BeginBlendMode(BLEND_ADDITIVE);
+    for (float x = 60.0f; x < VIRTUAL_W; x += 150.0f) {
+        float flick = 0.85f + 0.15f * std::sin(run.time * 13.0f + x);
+        glow(g, {x, WALL_TOP - 20}, 150.0f * flick, Color{255, 150, 60, static_cast<unsigned char>(70 * strength)});
+        glow(g, {x, WALL_TOP - 26}, 16.0f * flick, Color{255, 220, 120, 230});
+    }
+    glow(g, {run.squad_x, SQUAD_Y}, 160.0f, Color{255, 200, 120, static_cast<unsigned char>(40 * strength)});
+    EndBlendMode();
+    if (run.collapse_t >= 0.0f) return;
+    for (float x = 60.0f; x < VIRTUAL_W; x += 150.0f) {
+        DrawRectangleRec({x - 3, WALL_TOP - 22, 6, 14}, Color{60, 40, 26, 255});
+        DrawRectangleRec({x - 6, WALL_TOP - 24, 12, 4}, Color{40, 36, 34, 255});
+        float flick = 0.8f + 0.2f * std::sin(run.time * 17.0f + x);
+        ellipse(g, {x, WALL_TOP - 30}, 5 * flick, 9 * flick, Color{255, 140, 40, 255});
+        ellipse(g, {x, WALL_TOP - 28}, 2.5f * flick, 5 * flick, Color{255, 240, 160, 255});
+    }
+}
+
+void draw_vignette() {
+    DrawRectangleGradientH(0, 0, 90, VIRTUAL_H, Color{0, 0, 0, 70}, Color{0, 0, 0, 0});
+    DrawRectangleGradientH(VIRTUAL_W - 90, 0, 90, VIRTUAL_H, Color{0, 0, 0, 0}, Color{0, 0, 0, 70});
+}
+
 void draw_backdrop(Game& game, const Theme& th, float time) {
     ClearBackground(th.ground);
     if (GroundSlot* slot = find_ground(th.key)) draw_opaque(slot->tex.texture, {0.0f, 0.0f});
+    draw_live_env(game, th, time);
     DrawRectangleGradientV(0, 0, VIRTUAL_W, 420, with_alpha(th.fog, 0.85f), with_alpha(th.fog, 0.0f));
     draw_ambient(game, th, time);
 }
@@ -1868,6 +2269,7 @@ void render_world(Game& game) {
     for (const auto& f : run.loot) draw_loot(game, f);
 
     draw_night(run.theme);
+    draw_night_lights(game, run);
     draw_projectiles(game, run);
 
     draw_particles(game, run, false);
@@ -1912,6 +2314,7 @@ void render_world(Game& game) {
     }
 
     EndMode2D();
+    draw_vignette();
 
     if (run.flash > 0.0f) {
         DrawRectangle(0, 0, VIRTUAL_W, VIRTUAL_H, Color{255, 255, 255, static_cast<unsigned char>(run.flash * 180)});

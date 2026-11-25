@@ -24,6 +24,7 @@ void draw_loot(Game& game, const Loot& f);
 void draw_op(Vec2 c, char op, float size, Color col);
 void draw_wall(const Run& run);
 void draw_night(const Theme& theme);
+void draw_night_lights(Game& game, const Run& run);
 void draw_corpses(Game& game, const Run& run);
 void draw_boss_death(Game& game, const Run& run, const BossDeath& b);
 void draw_wall_collapse(const Run& run, const Gfx& g);

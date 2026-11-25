@@ -287,6 +287,7 @@ void page_themes(Game& game, int set) {
         l.max_hp = 100;
         l.pos = {600, WALL_TOP - 130};
         draw_night(th);
+        draw_night_lights(game, run);
         draw_wall(run);
         EndMode2D();
         EndScissorMode();
