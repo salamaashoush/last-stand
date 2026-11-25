@@ -342,6 +342,81 @@ void page_outfits(Game& game) {
     }
 }
 
+void page_wall_states(Game& game) {
+    backdrop("WALL: 100% / 45% / 10% / COLLAPSE 0.3s / 0.8s / 1.4s");
+    float states[] = {1.0f, 0.45f, 0.1f, -0.3f, -0.8f, -1.4f};
+    for (int i = 0; i < 6; ++i) {
+        auto& run = fresh_run(game);
+        run.theme = make_theme(1);
+        run.time = 1.3f;
+        run.squad = {UnitType::Rifleman, UnitType::Gunner};
+        if (states[i] > 0.0f) {
+            run.wall_hp = run.stats.wall_max * states[i];
+        } else {
+            run.wall_hp = 0;
+            run.collapse_t = -states[i];
+        }
+        float band_top = 60.0f + static_cast<float>(i) * 203.0f;
+        Camera2D cam{};
+        cam.zoom = 1.0f;
+        cam.offset = {0, band_top - (WALL_TOP - 50.0f)};
+        BeginScissorMode(0, static_cast<int>(band_top), VIRTUAL_W, 200);
+        BeginMode2D(cam);
+        ClearBackground(run.theme.ground);
+        DrawRectangle(0, 0, VIRTUAL_W, VIRTUAL_H, run.theme.ground);
+        draw_wall(run);
+        if (run.collapse_t >= 0.0f) draw_wall_collapse(run, game.gfx);
+        EndMode2D();
+        EndScissorMode();
+    }
+}
+
+void page_deaths(Game& game) {
+    backdrop("BOSS DEATH (0.2 / 0.9 / 1.6 / 2.0 / burst) + SOLDIERS LOST");
+    float times[] = {0.2f, 0.9f, 1.6f, 2.0f, 2.25f};
+    for (int i = 0; i < 5; ++i) {
+        auto& run = fresh_run(game);
+        run.theme = make_theme(3);
+        run.boss = make_boss(3, false);
+        Vec2 at{i < 3 ? 130.0f + static_cast<float>(i) * 230.0f : 245.0f + static_cast<float>(i - 3) * 230.0f,
+                i < 3 ? 260.0f : 640.0f};
+        gallery_boss_death(game, at, 70.0f);
+        float t = 0.0f;
+        while (t < times[i]) {
+            gallery_step_full(game, 1.0f / 120.0f);
+            t += 1.0f / 120.0f;
+        }
+        BeginScissorMode(static_cast<int>(at.x - 115), static_cast<int>(at.y - 190), 230, 370);
+        for (const auto& b : run.boss_deaths) draw_boss_death(game, run, b);
+        draw_particles(game, run, false);
+        BeginBlendMode(BLEND_ADDITIVE);
+        draw_particles(game, run, true);
+        EndBlendMode();
+        EndScissorMode();
+    }
+    float ct[] = {0.08f, 0.3f, 0.7f};
+    for (int i = 0; i < 3; ++i) {
+        auto& run = fresh_run(game);
+        run.theme = make_theme(1);
+        run.squad = {UnitType::Rifleman, UnitType::Gunner, UnitType::Grenadier};
+        run.soldiers = 20;
+        run.squad_x = 130.0f + static_cast<float>(i) * 230.0f;
+        gallery_corpses(game, 8);
+        float t = 0.0f;
+        while (t < ct[i]) {
+            gallery_step_full(game, 1.0f / 120.0f);
+            t += 1.0f / 120.0f;
+        }
+        Camera2D cam{};
+        cam.zoom = 1.0f;
+        cam.offset = {0, 1000.0f - SQUAD_Y};
+        BeginMode2D(cam);
+        draw_corpses(game, run);
+        draw_particles(game, run, false);
+        EndMode2D();
+    }
+}
+
 void stage_battle(Game& game) {
     game.request = {3, false};
     start_run(game);
@@ -392,7 +467,7 @@ MissionsState g_missions;
 } // namespace
 
 int gallery_page_count() {
-    return 19;
+    return 21;
 }
 
 // Everything that renders into an offscreen target (ground textures, decals) happens here,
@@ -477,6 +552,12 @@ void render_gallery(Game& game, int page) {
         break;
     case 18:
         page_outfits(game);
+        break;
+    case 19:
+        page_wall_states(game);
+        break;
+    case 20:
+        page_deaths(game);
         break;
     case 7:
     case 8:

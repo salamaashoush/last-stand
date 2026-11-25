@@ -500,7 +500,7 @@ void render_hud(Game& game) {
     key_badge(g, {ab.x, ab.y + 46}, "SPACE");
     if (!run.picking && !game.paused && ready && hit(game, {ab.x - 46, ab.y - 46, 92, 92})) trigger_airstrike(game);
 
-    if (!run.picking && !game.paused) {
+    if (!run.picking && !game.paused && run.collapse_t < 0.0f) {
         for (int s = 0; s < TURRET_SLOTS; ++s) {
             key_badge(g, {TURRET_SLOT_X[s] + 30, TURRET_Y - 30}, s == 0 ? "1" : s == 1 ? "2" : s == 2 ? "3" : "4");
             if (s == run.build_slot) continue;

@@ -189,6 +189,7 @@ void damage_enemy(Ctx& c, int idx, float dmg, bool crit, bool status, float knoc
     if (status && e.armor > 0.0f) dmg *= 1.0f - e.armor;
     e.hp -= dmg;
     e.flash = 0.09f;
+    e.hurt = std::min(1.0f, e.hurt + 0.35f);
     e.knock += knock * (1.0f - e.knock_resist);
     c.run.tally.damage_dealt += dmg;
     if (status) {
@@ -348,14 +349,11 @@ void kill_enemy(Ctx& c, int idx) {
         run.tally.bosses++;
         int gems = (e.mini_boss ? 3 : 8) * d.stage;
         run.gems_found += gems;
-        run.slowmo = 1.4f;
-        run.flash = 0.5f;
-        add_shake(run, 28.0f);
-        for (int i = 0; i < 6; ++i) {
-            Vec2 p = pos + Vec2{run.rng.uniform(-70, 70), run.rng.uniform(-70, 70)};
-            explosion_fx(run, p, 90.0f, Color{255, 140, 60, 255});
-        }
-        c.game.sound.play(Sfx::BigExplosion, 1.0f, 0.8f);
+        run.slowmo = 1.8f;
+        run.hitstop = 0.12f;
+        add_shake(run, 14.0f);
+        c.game.sound.play(Sfx::BossRoar, 1.0f, 0.7f);
+        run.boss_deaths.push_back({pos, radius, 0.0f, e.mini_boss, gems, 0.0f});
         const BossGenome& genome = e.mini_boss ? run.mini_boss : run.boss;
         if (genome.has(BossPower::Splitter)) {
             for (int k = 0; k < 2; ++k) {
@@ -367,7 +365,8 @@ void kill_enemy(Ctx& c, int idx) {
                 child.radius = radius * 0.6f;
             }
         }
-        run.banner = {genome.name, std::format("DEFEATED!  +{} GEMS", gems), Color{255, 210, 70, 255}, 2.6f, 2.6f};
+        run.pending_boss_banner = {genome.name, std::format("DEFEATED!  +{} GEMS", gems), Color{255, 210, 70, 255},
+                                   2.6f, 2.6f};
         if (run.wave != WAVES_PER_STAGE || run.endless) c.game.play_music(run.stage % 2 ? "battle" : "battle2");
     }
 }
@@ -850,7 +849,16 @@ void damage_wall(Ctx& c, float amount, Vec2 at) {
     auto& run = c.run;
     run.wall_hp -= amount;
     run.wall_damage_rate += amount;
-    if (amount > 8.0f) run.wall_flash = 0.12f;
+    if (amount > 8.0f) {
+        run.wall_flash = 0.12f;
+        run.wall_jolt = std::min(1.0f, run.wall_jolt + amount / 60.0f);
+        int chunks = std::min(10, static_cast<int>(amount / 6.0f));
+        for (int i = 0; i < chunks; ++i) {
+            gib(run, {at.x + run.rng.uniform(-24, 24), WALL_TOP + run.rng.uniform(-4, 20)},
+                mix(run.theme.stone, Color{90, 84, 78, 255}, run.rng.unit()), run.rng.uniform(2.5f, 5.5f), 160.0f,
+                300.0f, 0.9f);
+        }
+    }
     if (run.rng.chance(std::min(1.0f, amount * 0.05f))) {
         particle(run, at, {run.rng.uniform(-40, 40), run.rng.uniform(-90, -30)}, 0.6f, 6.0f, 16.0f,
                  Color{150, 130, 110, 160}, PSmoke, 2.0f);
@@ -955,7 +963,8 @@ void update_enemies(Ctx& c, float dt) {
                       (e.enraged ? 1.5f : 1.0f);
         e.pos.y -= e.knock * dt * 6.0f;
         e.knock *= std::exp(-10.0f * dt);
-        float stop_line = WALL_TOP - e.radius * 0.55f;
+        float stop_line = run.collapse_t > 0.5f ? VIRTUAL_H + 200.0f : WALL_TOP - e.radius * 0.55f;
+        e.hurt = std::max(0.0f, e.hurt - dt * 5.0f);
 
         if (e.type == EnemyType::Spitter && e.pos.y >= e.stop_y) {
             e.action_timer -= dt;
@@ -990,7 +999,7 @@ void update_enemies(Ctx& c, float dt) {
                 }
             }
         } else {
-            if (e.pos.y < stop_line - 4.0f) e.at_wall = false;
+            if (e.pos.y < stop_line - 4.0f || run.collapse_t > 0.5f) e.at_wall = false;
             float dps = e.wall_dps * (e.enraged ? 1.5f : 1.0f);
             damage_wall(c, dps * dt, {e.pos.x, WALL_TOP + 4});
             wall_sound += dps * dt;
@@ -1048,6 +1057,114 @@ void update_acids(Ctx& c, float dt) {
     std::erase_if(run.acids, [](const Acid& a) { return !a.alive; });
 }
 
+void spawn_corpses(Run& run, int count) {
+    int visible = visible_soldiers(run.soldiers);
+    for (int i = 0; i < count && visible > 0; ++i) {
+        int si = run.rng.range(0, visible - 1);
+        Corpse k;
+        k.pos = Vec2{run.squad_x, SQUAD_Y} + soldier_offset(si, visible);
+        k.vel = {run.rng.uniform(-160, 160), run.rng.uniform(40, 160)};
+        k.spin = run.rng.uniform(-720, 720);
+        k.vz = run.rng.uniform(220, 380);
+        k.life = 1.6f;
+        k.unit = run.squad[static_cast<size_t>(si) % run.squad.size()];
+        run.corpses.push_back(k);
+        burst(run, k.pos, 3, Color{150, 20, 24, 255}, 120.0f, 3.0f, PDisc, 0.4f);
+    }
+}
+
+void update_corpses(Run& run, float dt) {
+    for (auto& k : run.corpses) {
+        k.life -= dt;
+        k.pos += k.vel * dt;
+        k.vel = k.vel * std::exp(-1.5f * dt);
+        k.vz -= 1100.0f * dt;
+        k.z += k.vz * dt;
+        k.rot += k.spin * dt;
+        if (k.z <= 0.0f) {
+            k.z = 0.0f;
+            k.vz = std::abs(k.vz) > 120.0f ? -k.vz * 0.3f : 0.0f;
+            k.spin *= 0.3f;
+            k.vel = k.vel * 0.4f;
+        }
+    }
+    std::erase_if(run.corpses, [](const Corpse& k) { return k.life <= 0.0f; });
+}
+
+float boss_death_duration(const BossDeath& b) {
+    return b.mini ? 1.3f : 2.1f;
+}
+
+void update_boss_deaths(Ctx& c, float dt) {
+    auto& run = c.run;
+    for (auto& b : run.boss_deaths) {
+        b.t += dt;
+        b.next_blast -= dt;
+        float dur = boss_death_duration(b);
+        if (b.t < dur && b.next_blast <= 0.0f) {
+            float k = b.t / dur;
+            b.next_blast = 0.16f - 0.1f * k;
+            Vec2 p =
+                b.pos + Vec2{run.rng.uniform(-b.radius, b.radius) * 0.8f, run.rng.uniform(-b.radius, b.radius) * 0.8f};
+            explosion_fx(run, p, b.radius * (0.5f + 0.4f * k), Color{255, 140, 60, 255});
+            add_shake(run, 6.0f + 10.0f * k);
+            c.game.sound.play(Sfx::Explosion, 0.6f, run.rng.uniform(0.8f, 1.2f));
+        }
+        if (b.t >= dur) {
+            const BossGenome& gen = b.mini ? run.mini_boss : run.boss;
+            run.flash = 0.7f;
+            run.zoom_kick = 1.0f;
+            run.hitstop = 0.08f;
+            add_shake(run, 30.0f);
+            c.game.sound.play(Sfx::BigExplosion, 1.0f, 0.75f);
+            explosion_fx(run, b.pos, b.radius * 2.2f, Color{255, 160, 70, 255});
+            for (int r = 0; r < 3; ++r) {
+                shockwave(run, b.pos, b.radius * 0.5f, b.radius * (3.0f + 1.5f * static_cast<float>(r)),
+                          0.4f + 0.15f * static_cast<float>(r),
+                          r == 1 ? with_alpha(gen.accent, 0.9f) : Color{255, 230, 180, 200});
+            }
+            for (int i = 0; i < 34; ++i) {
+                Color col = i % 5 == 0 ? Color{232, 220, 192, 255} : (i % 2 ? gen.body : darken(gen.body, 0.35f));
+                gib(run,
+                    b.pos +
+                        Vec2{run.rng.uniform(-b.radius, b.radius) * 0.5f, run.rng.uniform(-b.radius, b.radius) * 0.5f},
+                    col, run.rng.uniform(5.0f, b.radius * 0.18f), 520.0f, 520.0f, 1.6f);
+            }
+            for (int i = 0; i < 26; ++i) {
+                float a = run.rng.uniform(0, 2 * PI);
+                float sp = run.rng.uniform(200, 520);
+                additive_particle(run, b.pos, {std::cos(a) * sp, std::sin(a) * sp - 120.0f},
+                                  run.rng.uniform(0.7f, 1.2f), 10.0f, 3.0f,
+                                  i % 2 ? Color{120, 230, 255, 255} : Color{255, 220, 90, 255}, PStar, 2.0f);
+            }
+            run.pending_decals.push_back({b.pos, b.radius * 1.6f, Color{30, 24, 20, 120}, run.rng.uniform(0, 360), 1});
+            run.pending_decals.push_back(
+                {b.pos, b.radius * 1.2f, with_alpha(enemy_blood_color(EnemyType::Boss), 0.6f), 0, 0});
+            run.banner = run.pending_boss_banner;
+        }
+    }
+    std::erase_if(run.boss_deaths, [](const BossDeath& b) { return b.t >= boss_death_duration(b); });
+}
+
+void update_collapse(Ctx& c, float dt) {
+    auto& run = c.run;
+    if (run.collapse_t < 0.0f) return;
+    float before = run.collapse_t;
+    run.collapse_t += dt;
+    if (run.collapse_t < 1.4f && run.rng.chance(dt * 40.0f)) {
+        Vec2 p{run.rng.uniform(0, VIRTUAL_W), WALL_TOP + run.rng.uniform(10, 70)};
+        particle(run, p, {run.rng.uniform(-60, 60), run.rng.uniform(-80, -20)}, run.rng.uniform(1.0f, 1.8f), 18.0f,
+                 60.0f, Color{150, 136, 120, 170}, PSmoke, 1.2f);
+    }
+    for (float mark : {0.15f, 0.5f, 0.9f}) {
+        if (before < mark && run.collapse_t >= mark) {
+            c.game.sound.play(Sfx::WallHit, 1.0f, 0.6f);
+            c.game.sound.play(Sfx::Explosion, 0.8f, 0.6f);
+            add_shake(run, 18.0f);
+        }
+    }
+}
+
 void apply_gate_to_squad(Ctx& c, Gate& g) {
     auto& run = c.run;
     if (g.state.kind == GateKind::Rate || g.state.kind == GateKind::Power) {
@@ -1071,6 +1188,13 @@ void apply_gate_to_squad(Ctx& c, Gate& g) {
     int before = run.soldiers;
     run.soldiers = apply_gate(run.soldiers, g.state);
     int delta = run.soldiers - before;
+    if (delta < 0) {
+        int lost_visible = visible_soldiers(before) - visible_soldiers(run.soldiers);
+        int was = run.soldiers;
+        run.soldiers = before;
+        spawn_corpses(run, std::max(std::min(-delta, 6), lost_visible));
+        run.soldiers = was;
+    }
     run.tally.gates_taken++;
     run.tally.max_soldiers = std::max(run.tally.max_soldiers, run.soldiers);
     run.soldier_pop = 1.0f;
@@ -1541,6 +1665,14 @@ void open_cards(Ctx& c) {
     run.picking = true;
     run.pick_anim = 0.0f;
     c.game.sound.play(Sfx::LevelUp, 0.8f);
+    Vec2 at{run.squad_x, SQUAD_Y};
+    shockwave(run, at, 20.0f, 220.0f, 0.5f, Color{255, 220, 90, 220});
+    for (int i = 0; i < 24; ++i) {
+        float a = run.rng.uniform(-PI, 0.0f);
+        float sp = run.rng.uniform(160, 380);
+        additive_particle(run, at, {std::cos(a) * sp, std::sin(a) * sp}, run.rng.uniform(0.5f, 0.9f), 7.0f, 2.0f,
+                          Color{255, 220, 90, 255}, PStar, 2.5f);
+    }
 }
 
 } // namespace
@@ -1642,6 +1774,16 @@ void pick_card(Game& game, int index) {
     game.sound.play(Sfx::CardPick, 0.9f);
     Ctx c{game, run};
     float_text(run, card_def(id).name, {VIRTUAL_W * 0.5f, 760}, Color{255, 230, 120, 255}, 40.0f, 1.2f);
+    if (card_def(id).rarity == Rarity::Evolution) {
+        run.flash = 0.6f;
+        run.zoom_kick = 1.0f;
+        run.banner = {"EVOLUTION!", card_def(id).name, Color{255, 170, 40, 255}, 2.2f, 2.2f};
+        game.sound.play(Sfx::Victory, 0.8f, 1.3f);
+        Vec2 at{run.squad_x, SQUAD_Y};
+        for (int r = 0; r < 3; ++r)
+            shockwave(run, at, 30.0f, 300.0f + 120.0f * static_cast<float>(r), 0.5f + 0.15f * static_cast<float>(r),
+                      Color{255, 170, 40, 220});
+    }
     if (run.pending_levels > 0) open_cards(c);
 }
 
@@ -1754,12 +1896,30 @@ void gallery_step(Run& run, float dt) {
     update_fx(run, dt);
 }
 
+void gallery_step_full(Game& game, float dt) {
+    Ctx c{game, *game.run};
+    update_boss_deaths(c, dt);
+    update_corpses(*game.run, dt);
+    update_collapse(c, dt);
+    update_fx(*game.run, dt);
+}
+
+void gallery_boss_death(Game& game, Vec2 p, float r) {
+    game.run->boss_deaths.push_back({p, r, 0.0f, false, 10, 0.0f});
+}
+
+void gallery_corpses(Game& game, int n) {
+    spawn_corpses(*game.run, n);
+}
+
 void update_run(Game& game, float real_dt) {
     auto& run = *game.run;
     if (run.finished) return;
     Ctx c{game, run};
 
     run.shake = std::max(0.0f, run.shake - real_dt * 40.0f);
+    run.wall_jolt = std::max(0.0f, run.wall_jolt - real_dt * 6.0f);
+    run.zoom_kick = std::max(0.0f, run.zoom_kick - real_dt * 2.5f);
     run.flash = std::max(0.0f, run.flash - real_dt * 2.0f);
     run.hint_timer = std::max(0.0f, run.hint_timer - real_dt);
     run.banner.timer = std::max(0.0f, run.banner.timer - real_dt);
@@ -1873,6 +2033,9 @@ void update_run(Game& game, float real_dt) {
     update_airstrike(c, dt);
     if (alive_phase) update_chain(c, dt);
     update_coins(c, dt);
+    update_boss_deaths(c, dt);
+    update_corpses(run, dt);
+    update_collapse(c, dt);
     update_fx(run, dt);
     update_director(run, dt);
     std::erase_if(run.enemies, [](const Enemy& e) { return e.dead; });
@@ -1882,15 +2045,18 @@ void update_run(Game& game, float real_dt) {
     if (alive_phase && run.wall_hp <= 0.0f) {
         run.wall_hp = 0.0f;
         run.phase = WavePhase::Lost;
-        run.phase_timer = 3.0f;
+        run.phase_timer = 3.8f;
+        run.collapse_t = 0.0f;
+        spawn_corpses(run, visible_soldiers(run.soldiers));
+        run.soldiers = 0;
         run.slowmo = 2.0f;
         run.banner = {"THE WALL HAS FALLEN", std::format("SURVIVED {} WAVES", std::max(0, run.wave - 1)),
                       Color{255, 80, 70, 255}, 3.0f, 3.0f};
         game.sound.play(Sfx::Defeat, 1.0f);
         game.sound.play(Sfx::BigExplosion, 1.0f, 0.7f);
         add_shake(run, 26.0f);
-        for (int k = 0; k < 8; ++k) {
-            explosion_fx(run, {run.rng.uniform(40, VIRTUAL_W - 40), WALL_TOP + run.rng.uniform(0, 60)}, 80.0f,
+        for (int k = 0; k < 5; ++k) {
+            explosion_fx(run, {run.rng.uniform(40, VIRTUAL_W - 40), WALL_TOP + run.rng.uniform(0, 60)}, 70.0f,
                          Color{255, 120, 60, 255});
         }
     }

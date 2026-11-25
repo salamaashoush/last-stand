@@ -226,7 +226,7 @@ void draw_bat(const Gfx& g, Vec2 p, float r, float anim, float flash, Color body
 // that tells each type apart at a glance.
 void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, float flash, bool slowed, bool elite,
                   float time, float shield_ratio, float shield_flash, bool armored, Color tint, float tint_amount,
-                  int biome) {
+                  int biome, float hurt) {
     if (type == EnemyType::Barrel) {
         draw_barrel(g, p, r, flash, 1.0f, time);
         return;
@@ -248,7 +248,8 @@ void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, flo
     float step = std::sin(anim * stride);
     float squash = type == EnemyType::Exploder ? 1.0f + std::sin(anim * 8.0f) * 0.07f : 1.0f - std::abs(step) * 0.035f;
     Vec2 c = p - Vec2{0, std::abs(step) * r * 0.06f};
-    float ry = r * squash;
+    float ry = r * squash * (1.0f - 0.16f * hurt);
+    float rw = r * (1.0f + 0.14f * hurt);
     float ow = std::max(2.0f, r * 0.1f);
     bool big = type == EnemyType::Brute;
 
@@ -273,11 +274,11 @@ void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, flo
         line(shoulders[k], hands[k], arm_w + ow * 2.0f, outline);
         disc(g, hands[k], hand_r + ow, outline);
     }
-    ellipse(g, c, r + ow, ry + ow, outline);
+    ellipse(g, c, rw + ow, ry + ow, outline);
 
     for (const auto& f : feet) ellipse(g, f, r * 0.25f, r * 0.16f, shade);
     for (int k = 0; k < 2; ++k) line(shoulders[k], hands[k], arm_w, body);
-    ellipse(g, c, r, ry, body);
+    ellipse(g, c, rw, ry, body);
     for (int k = 0; k < 3; ++k) {
         float t = static_cast<float>(k) / 2.0f;
         ellipse(g, c + Vec2{0, ry * (0.46f - 0.1f * t)}, r * (0.9f - 0.08f * t), ry * (0.5f - 0.08f * t),
@@ -863,13 +864,68 @@ void draw_wall_weather(const Run& run) {
     }
 }
 
-void draw_wall(const Run& run) {
-    const Theme& b = run.theme;
+void draw_courtyard(const Theme& b) {
     DrawRectangle(0, static_cast<int>(WALL_BOTTOM), VIRTUAL_W, static_cast<int>(VIRTUAL_H - WALL_BOTTOM), b.court);
     for (int y = static_cast<int>(WALL_BOTTOM) + 18; y < VIRTUAL_H; y += 36) {
         DrawLine(0, y, VIRTUAL_W, y, darken(b.court, 0.15f));
         for (int x = ((y / 36) % 2) * 36; x < VIRTUAL_W; x += 72) DrawLine(x, y, x, y + 36, darken(b.court, 0.15f));
     }
+}
+
+// The wall breaks up brick by brick: each block falls after a delay that ripples out from
+// the centre, tumbles, and leaves a growing heap of rubble.
+void draw_wall_collapse(const Run& run, const Gfx& g) {
+    const Theme& th = run.theme;
+    float t = run.collapse_t;
+    Color stone = mix(th.stone, Color{110, 70, 60, 255}, 0.35f);
+    Rng rubble{777};
+    float pile = std::min(1.0f, t / 1.2f);
+    for (int i = 0; i < 40; ++i) {
+        float x = rubble.uniform(-20, VIRTUAL_W + 20);
+        float r = rubble.uniform(14, 30) * pile;
+        if (r < 1.0f) continue;
+        float y = WALL_BOTTOM - 8.0f + rubble.uniform(-10, 18);
+        DrawPoly({x + 2, y + 4}, 6, r, rubble.uniform(0, 60), Color{0, 0, 0, 70});
+        DrawPoly({x, y}, 6, r, rubble.uniform(0, 60), darken(stone, rubble.uniform(0.1f, 0.45f)));
+    }
+    constexpr float BW = 60.0f;
+    constexpr float BH = 17.0f;
+    for (int row = -1; row < 4; ++row) {
+        float y0 = row < 0 ? WALL_TOP - 16.0f : WALL_TOP + 8.0f + static_cast<float>(row) * BH;
+        float w = row < 0 ? 34.0f : BW;
+        float h = row < 0 ? 22.0f : BH;
+        float step = row < 0 ? 52.0f : BW;
+        float start = row < 0 ? 4.0f : ((row % 2) ? -10.0f : 20.0f);
+        for (float x = start; x < VIRTUAL_W; x += step) {
+            Rng r{static_cast<uint64_t>((row + 2) * 1000 + static_cast<int>(x))};
+            float centre = std::abs(x + w * 0.5f - VIRTUAL_W * 0.5f) / (VIRTUAL_W * 0.5f);
+            float delay = centre * 0.5f + r.uniform(0.0f, 0.35f) + static_cast<float>(3 - row) * 0.05f;
+            float ft = std::max(0.0f, t - delay);
+            float dy = 0.5f * 1800.0f * ft * ft;
+            float dx = r.uniform(-60, 60) * ft;
+            float rot = r.uniform(-260, 260) * ft;
+            float landed = WALL_BOTTOM + r.uniform(0, 70);
+            Vec2 c{x + w * 0.5f + dx, y0 + h * 0.5f + dy};
+            if (c.y > landed) c.y = landed;
+            float fade = std::clamp(1.0f - (t - delay - 0.8f), 0.0f, 1.0f);
+            if (fade <= 0.0f) continue;
+            Color fill = with_alpha(row < 0 ? brighten(stone, 0.15f) : stone, fade);
+            DrawRectanglePro({c.x, c.y, w, h}, {w * 0.5f, h * 0.5f}, rot, with_alpha(darken(stone, 0.45f), fade));
+            DrawRectanglePro({c.x, c.y, w - 4, h - 4}, {(w - 4) * 0.5f, (h - 4) * 0.5f}, rot, fill);
+        }
+    }
+    (void)g;
+}
+
+void draw_wall(const Run& run) {
+    const Theme& b = run.theme;
+    draw_courtyard(b);
+    if (run.collapse_t >= 0.0f) return;
+
+    float jolt = run.wall_jolt;
+    Vec2 shake{std::sin(run.time * 70.0f) * jolt * 3.0f, std::cos(run.time * 53.0f) * jolt * 2.0f};
+    rlPushMatrix();
+    rlTranslatef(shake.x, shake.y, 0);
 
     Color stone = b.stone;
     float ratio = std::clamp(run.wall_hp / run.stats.wall_max, 0.0f, 1.0f);
@@ -883,7 +939,15 @@ void draw_wall(const Run& run) {
             DrawLineEx({x, y}, {x, y + 17}, 2.0f, darken(stone, 0.3f));
         }
     }
-    for (float x = 4; x < VIRTUAL_W; x += 52.0f) {
+    // Battlements break away one by one as the wall takes damage.
+    int index = 0;
+    for (float x = 4; x < VIRTUAL_W; x += 52.0f, ++index) {
+        float threshold = std::fmod(static_cast<float>(index) * 0.618f, 1.0f) * 0.85f;
+        if (1.0f - ratio > threshold + 0.1f) {
+            DrawRectangleRec({x + 4, WALL_TOP - 6.0f, 26.0f, 12.0f}, darken(stone, 0.3f));
+            DrawPoly({x + 10, WALL_TOP - 4}, 5, 5, 20, darken(stone, 0.15f));
+            continue;
+        }
         Rectangle m{x, WALL_TOP - 16.0f, 34.0f, 22.0f};
         DrawRectangleRec(m, brighten(stone, 0.15f));
         DrawRectangleLinesEx(m, 2.0f, darken(stone, 0.35f));
@@ -891,7 +955,7 @@ void draw_wall(const Run& run) {
     DrawRectangle(0, static_cast<int>(WALL_BOTTOM) - 6, VIRTUAL_W, 6, darken(stone, 0.45f));
 
     Rng crack{4242};
-    int cracks = static_cast<int>((1.0f - ratio) * 14.0f);
+    int cracks = static_cast<int>((1.0f - ratio) * 18.0f);
     for (int k = 0; k < cracks; ++k) {
         Vec2 p{crack.uniform(20, VIRTUAL_W - 20), crack.uniform(WALL_TOP + 6, WALL_BOTTOM - 10)};
         for (int s = 0; s < 4; ++s) {
@@ -900,11 +964,25 @@ void draw_wall(const Run& run) {
             p = q;
         }
     }
+    // Below half health the wall burns; more fires the closer it is to falling.
+    int fires = ratio < 0.5f ? 1 + static_cast<int>((0.5f - ratio) * 12.0f) : 0;
+    Rng fire_rng{99};
+    BeginBlendMode(BLEND_ADDITIVE);
+    for (int k = 0; k < fires; ++k) {
+        Vec2 p{fire_rng.uniform(30, VIRTUAL_W - 30), WALL_TOP + fire_rng.uniform(2, 30)};
+        float flick = 0.7f + 0.3f * std::sin(run.time * (11.0f + static_cast<float>(k)) + static_cast<float>(k));
+        DrawEllipse(static_cast<int>(p.x), static_cast<int>(p.y - 10 * flick), 14 * flick, 22 * flick,
+                    Color{255, 90, 20, 150});
+        DrawEllipse(static_cast<int>(p.x), static_cast<int>(p.y - 6 * flick), 8 * flick, 14 * flick,
+                    Color{255, 200, 80, 200});
+    }
+    EndBlendMode();
     draw_wall_weather(run);
     if (run.wall_flash > 0.0f) {
         DrawRectangle(0, static_cast<int>(WALL_TOP) - 16, VIRTUAL_W, static_cast<int>(WALL_BOTTOM - WALL_TOP) + 16,
                       Color{255, 80, 60, static_cast<unsigned char>(run.wall_flash / 0.12f * 70)});
     }
+    rlPopMatrix();
 }
 
 void draw_turret(const Gfx& g, TurretType type, int level, Vec2 p, float aim, float recoil, float time, float charge) {
@@ -1629,6 +1707,44 @@ void draw_soldier_preview(Game& game, float x, float y, float scale, int weapon)
     draw_soldier(game.gfx, {x, y}, 0.0f, static_cast<UnitType>(weapon), scale, game.time);
 }
 
+void draw_corpses(Game& game, const Run& run) {
+    for (const auto& k : run.corpses) {
+        float shrink = std::min(1.0f, k.life / 0.35f);
+        ellipse(game.gfx, k.pos + Vec2{0, 8}, 12 * shrink, 5 * shrink, Color{0, 0, 0, 70});
+        rlPushMatrix();
+        rlTranslatef(k.pos.x, k.pos.y - k.z, 0);
+        rlRotatef(k.rot, 0, 0, 1);
+        draw_soldier(game.gfx, {0, 0}, 0, k.unit, SOLDIER_SCALE * shrink, game.time, run.theme.biome);
+        rlPopMatrix();
+    }
+}
+
+void draw_boss_death(Game& game, const Run& run, const BossDeath& b) {
+    const auto& g = game.gfx;
+    const BossGenome& gen = b.mini ? run.mini_boss : run.boss;
+    float dur = b.mini ? 1.3f : 2.1f;
+    float k = std::clamp(b.t / dur, 0.0f, 1.0f);
+    Vec2 jitter{std::sin(b.t * 70.0f) * b.radius * 0.06f * (0.4f + k),
+                std::cos(b.t * 63.0f) * b.radius * 0.04f * (0.4f + k)};
+    float swell = 1.0f + 0.15f * k * k;
+    BeginBlendMode(BLEND_ADDITIVE);
+    glow(g, b.pos, b.radius * (2.0f + 1.5f * k), Color{255, 120, 40, static_cast<unsigned char>(80 + 120 * k)});
+    EndBlendMode();
+    draw_boss(g, gen, run.theme.biome, b.pos + jitter, b.radius * swell, b.t * 3.0f,
+              std::sin(b.t * 40.0f) > 0.0f ? 0.09f : 0.0f, true, game.time, 0.0f);
+    BeginBlendMode(BLEND_ADDITIVE);
+    Rng rays{static_cast<uint64_t>(b.pos.x * 13.0f + b.pos.y)};
+    int n = 4 + static_cast<int>(k * 8.0f);
+    for (int i = 0; i < n; ++i) {
+        float a = rays.uniform(0, 2 * PI);
+        float len = b.radius * (0.3f + 1.4f * k) * rays.uniform(0.6f, 1.0f);
+        Vec2 d{std::cos(a), std::sin(a)};
+        line(b.pos + jitter, b.pos + jitter + d * len, 10.0f * (0.5f + k), Color{255, 160, 60, 120});
+        line(b.pos + jitter, b.pos + jitter + d * len * 0.9f, 3.5f, Color{255, 240, 200, 220});
+    }
+    EndBlendMode();
+}
+
 void draw_shells(Game& game, const Run& run) {
     const auto& g = game.gfx;
     for (const auto& s : run.shells) {
@@ -1699,8 +1815,10 @@ void render_world(Game& game) {
         shake = {std::sin(game.time * 91.0f) * run.shake * 0.6f, std::cos(game.time * 77.0f) * run.shake * 0.6f};
     }
     Camera2D cam{};
-    cam.offset = shake.to_raylib();
-    cam.zoom = 1.0f;
+    float zoom = 1.0f + 0.05f * run.zoom_kick * run.zoom_kick;
+    cam.target = {VIRTUAL_W * 0.5f, VIRTUAL_H * 0.5f};
+    cam.offset = {VIRTUAL_W * 0.5f + shake.x, VIRTUAL_H * 0.5f + shake.y};
+    cam.zoom = zoom;
     BeginMode2D(cam);
 
     draw_backdrop(game, run.theme, game.time);
@@ -1727,7 +1845,7 @@ void render_world(Game& game) {
         }
         draw_monster(g, e->type, e->pos, e->radius, e->anim, e->flash, e->slow_timer > 0.0f, e->elite, game.time,
                      e->shield_max > 0.0f ? std::max(0.0f, e->shield_hp / e->shield_max) : 0.0f, e->shield_flash,
-                     e->armor > 0.0f, run.theme.enemy_tint, run.theme.enemy_tint_amount, run.theme.biome);
+                     e->armor > 0.0f, run.theme.enemy_tint, run.theme.enemy_tint_amount, run.theme.biome, e->hurt);
         bool show_bar =
             (e->type == EnemyType::Brute || e->type == EnemyType::Spitter || e->type == EnemyType::Exploder ||
              e->type == EnemyType::Splitter || e->type == EnemyType::Shielder || e->elite || e->mini_boss) &&
@@ -1739,6 +1857,7 @@ void render_world(Game& game) {
         }
     }
 
+    for (const auto& b : run.boss_deaths) draw_boss_death(game, run, b);
     for (const auto& gate : run.gates) draw_gate(game, gate);
     for (const Enemy* e : order) {
         if (e->type != EnemyType::Flyer) continue;
@@ -1757,7 +1876,7 @@ void render_world(Game& game) {
     EndBlendMode();
 
     draw_wall(run);
-    draw_turrets(game, run);
+    if (run.collapse_t < 0.0f) draw_turrets(game, run);
 
     int visible = visible_soldiers(run.soldiers);
     for (int i = visible - 1; i >= 0; --i) {
@@ -1768,6 +1887,8 @@ void render_world(Game& game) {
         draw_soldier(g, p + Vec2{0, bob}, run.soldier_recoil[static_cast<size_t>(i)], u, SOLDIER_SCALE, game.time,
                      run.theme.biome);
     }
+    draw_corpses(game, run);
+    if (run.collapse_t >= 0.0f) draw_wall_collapse(run, g);
 
     if (run.plane_t >= 0.0f) {
         float x = -120.0f + run.plane_t * (VIRTUAL_W + 240.0f) / 1.2f;

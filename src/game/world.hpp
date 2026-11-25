@@ -84,6 +84,7 @@ struct Enemy {
     float armor{};
     float shield_flash{};
     float power_timer{};
+    float hurt{};
     float dash{};
     bool enraged{false};
 };
@@ -199,6 +200,29 @@ struct CoinFly {
     Vec2 vel{};
     float t{};
     int value{};
+};
+
+// A boss does not vanish on its last hit: it shudders, cracks open with explosions and then
+// bursts, while the run carries on around it.
+struct BossDeath {
+    Vec2 pos{};
+    float radius{};
+    float t{};
+    bool mini{false};
+    int gems{};
+    float next_blast{};
+};
+
+// A fallen soldier tumbling away from the squad.
+struct Corpse {
+    Vec2 pos{};
+    Vec2 vel{};
+    float rot{};
+    float spin{};
+    float z{};
+    float vz{};
+    float life{};
+    UnitType unit{UnitType::Rifleman};
 };
 
 struct Decal {
@@ -320,6 +344,7 @@ struct Run {
     float time{};
 
     Banner banner;
+    Banner pending_boss_banner;
     RunStatsTally tally;
 
     std::vector<Enemy> enemies;
@@ -327,6 +352,11 @@ struct Run {
     std::vector<Bullet> bullets;
     std::vector<Bullet> new_bullets;
     std::vector<Gate> gates;
+    std::vector<BossDeath> boss_deaths;
+    std::vector<Corpse> corpses;
+    float collapse_t{-1.0f};
+    float wall_jolt{};
+    float zoom_kick{};
     std::vector<Loot> loot;
     float loot_timer{16.0f};
     std::vector<Shell> shells;
