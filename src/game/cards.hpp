@@ -169,7 +169,7 @@ inline CardEffect apply_card(RunStats& s, CardId id) {
         s.burn_ratio += 0.6f;
         break;
     case CardId::Cryo:
-        s.slow = std::min(0.6f, s.slow + 0.2f);
+        s.slow = std::min(0.65f, s.slow + 0.25f);
         break;
     case CardId::Explosive:
         s.explosive_radius += 26.0f;

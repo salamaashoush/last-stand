@@ -1,6 +1,7 @@
 #include "states/states.hpp"
 #include "core/game.hpp"
 #include "game/autopilot.hpp"
+#include "game/kids.hpp"
 #include "game/render.hpp"
 #include "game/sim.hpp"
 #include <algorithm>
@@ -166,7 +167,11 @@ void MenuState::render(Game& game) {
     EndBlendMode();
     text(g, "LAST", {VIRTUAL_W * 0.5f, 170 + bob}, 130, GOLD_TINT);
     text(g, "STAND", {VIRTUAL_W * 0.5f, 290 + bob}, 130, Color{255, 120, 60, 255});
-    text(g, "HORDE DEFENSE", {VIRTUAL_W * 0.5f, 385}, 30, Color{230, 230, 240, 255});
+    text(g, "HORDE DEFENSE", {VIRTUAL_W * 0.5f, 380}, 30, Color{230, 230, 240, 255});
+    text(g, "STARRING OMAR & ALI", {VIRTUAL_W * 0.5f, 418}, 22, GOLD_TINT);
+    draw_kid(g, Kid::Omar, {82, 352}, 1.45f, KidPose::Wave, game.time);
+    draw_kid(g, Kid::Ali, {640, 352}, 1.45f, std::fmod(game.time, 6.0f) < 3.0f ? KidPose::Peace : KidPose::Wave,
+             game.time);
 
     gems_badge(game);
     star({44, 48}, 20, GOLD_TINT);
@@ -304,6 +309,7 @@ void PlayingState::update(Game& game, float dt) {
         run.squad_target_x += dir * 720.0f * dt;
         if (IsKeyPressed(KEY_SPACE)) trigger_airstrike(game);
         if (IsKeyPressed(KEY_E)) trigger_frenzy(game);
+        if (IsKeyPressed(KEY_Q)) trigger_ali(game);
         for (int s = 0; s < TURRET_SLOTS; ++s) {
             if (IsKeyPressed(KEY_ONE + s)) {
                 run.build_slot = run.build_slot == s ? -1 : s;
@@ -369,6 +375,10 @@ void ResultsState::render(Game& game) {
                                 : std::format("STAGE {}  -  REACHED WAVE {}", r.stage, r.waves_cleared + 1);
     text(g, sub, {VIRTUAL_W * 0.5f, 250}, 28, WHITE);
 
+    if (r.won) {
+        draw_kid(g, Kid::Omar, {80, 400}, 1.3f, KidPose::Cheer, game.time);
+        draw_kid(g, Kid::Ali, {640, 400}, 1.3f, KidPose::Peace, game.time + 0.4f);
+    }
     if (r.won && !r.endless) {
         for (int i = 0; i < 3; ++i) {
             float appear = std::clamp((t_ - 0.4f - static_cast<float>(i) * 0.3f) * 4.0f, 0.0f, 1.0f);

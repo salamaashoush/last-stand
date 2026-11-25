@@ -1,5 +1,6 @@
 #include "core/game.hpp"
 #include "game/autopilot.hpp"
+#include "game/probe.hpp"
 #include "game/render.hpp"
 #include "states/states.hpp"
 #include <algorithm>
@@ -118,6 +119,10 @@ void frame() {
 } // namespace
 
 int main() {
+    if (std::getenv("LS_PROBE")) {
+        SetTraceLogLevel(LOG_WARNING);
+        return ls::run_probe();
+    }
     if (const char* runs = std::getenv("LS_HEADLESS")) {
         SetTraceLogLevel(LOG_INFO);
         return ls::run_headless(std::max(1, std::atoi(runs)));

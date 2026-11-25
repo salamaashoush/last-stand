@@ -1,6 +1,7 @@
 #include "game/render.hpp"
 #include "core/game.hpp"
 #include "game/formation.hpp"
+#include "game/kids.hpp"
 #include "game/render_parts.hpp"
 #include "game/sim.hpp"
 #include "game/turrets.hpp"
@@ -2244,6 +2245,11 @@ void render_world(Game& game) {
             draw_barrel(g, e->pos, e->radius, e->flash, e->hp / e->max_hp, game.time);
             continue;
         }
+        if (e->charm > 0.0f) {
+            float bob = std::sin(game.time * 5.0f + e->wobble_seed) * 3.0f;
+            draw_heart(e->pos + Vec2{0, -e->radius - 14 + bob}, std::max(4.0f, e->radius * 0.28f),
+                       Color{255, 110, 160, 230});
+        }
         draw_monster(g, e->type, e->pos, e->radius, e->anim, e->flash, e->slow_timer > 0.0f, e->elite, game.time,
                      e->shield_max > 0.0f ? std::max(0.0f, e->shield_hp / e->shield_max) : 0.0f, e->shield_flash,
                      e->armor > 0.0f, run.theme.enemy_tint, run.theme.enemy_tint_amount, run.theme.biome, e->hurt);
@@ -2294,7 +2300,23 @@ void render_world(Game& game) {
                      game.time, run.theme.biome);
     }
     draw_corpses(game, run);
+    if (run.collapse_t < 0.0f && run.soldiers > 0) {
+        KidPose pose = run.frenzy_t > 0.0f           ? KidPose::Rally
+                       : run.phase == WavePhase::Won ? KidPose::Cheer
+                                                     : KidPose::Idle;
+        draw_kid(g, Kid::Omar, {omar_x(run.squad_x, visible), SQUAD_Y + 22}, 0.95f, pose, game.time);
+    }
     if (run.collapse_t >= 0.0f) draw_wall_collapse(run, g);
+    if (run.ali_t >= 0.0f) {
+        float t = run.ali_t;
+        float rise = t < 0.25f ? 1.0f - t / 0.25f : t > 1.9f ? (t - 1.9f) / 0.3f : 0.0f;
+        float hop = std::abs(std::sin(t * 6.0f)) * 10.0f * (1.0f - rise);
+        Vec2 feet{VIRTUAL_W * 0.5f, WALL_TOP - 8.0f + rise * 120.0f - hop};
+        BeginBlendMode(BLEND_ADDITIVE);
+        glow(g, feet + Vec2{0, -60}, 150, Color{255, 140, 190, static_cast<unsigned char>(120 * (1.0f - rise))});
+        EndBlendMode();
+        draw_kid(g, Kid::Ali, feet, 1.6f * (1.0f - 0.3f * rise), KidPose::Peace, game.time);
+    }
 
     if (run.plane_t >= 0.0f) {
         float x = -120.0f + run.plane_t * (VIRTUAL_W + 240.0f) / 1.2f;

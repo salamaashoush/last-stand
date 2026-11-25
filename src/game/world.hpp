@@ -85,6 +85,7 @@ struct Enemy {
     float shield_flash{};
     float power_timer{};
     float hurt{};
+    float charm{};
     float dash{};
     bool enraged{false};
 };
@@ -316,6 +317,8 @@ struct Run {
     float airstrike_cd{8.0f};
     float rage{};
     float frenzy_t{};
+    float ali_charge{0.5f};
+    float ali_t{-1.0f};
     float chain_timer{};
     std::array<Turret, TURRET_SLOTS> turrets{};
     int build_slot{-1};

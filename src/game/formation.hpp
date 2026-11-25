@@ -57,6 +57,13 @@ inline Vec2 soldier_offset(int index, int visible) {
             static_cast<float>(row) * SOLDIER_SPACING_Y};
 }
 
+// Omar stands beside the formation on whichever side has room; the squad badge takes the other.
+inline float omar_x(float squad_x, int visible) {
+    float half = formation_half_width(visible);
+    float left = squad_x - half - 24.0f;
+    return left > 40.0f ? left : squad_x + half + 24.0f;
+}
+
 inline float clamp_squad_x(float x, int visible) {
     float hw = formation_half_width(visible);
     return std::clamp(x, hw + 6.0f, static_cast<float>(VIRTUAL_W) - hw - 6.0f);

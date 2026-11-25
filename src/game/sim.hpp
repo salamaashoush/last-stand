@@ -14,6 +14,7 @@ void build_or_upgrade(Game& game, int slot, TurretType type);
 void sell_turret(Game& game, int slot);
 void trigger_airstrike(Game& game);
 void trigger_frenzy(Game& game);
+void trigger_ali(Game& game);
 void repair_wall(Game& game);
 int repair_cost(const Run& run);
 

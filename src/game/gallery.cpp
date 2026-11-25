@@ -1,5 +1,6 @@
 #include "core/game.hpp"
 #include "game/formation.hpp"
+#include "game/kids.hpp"
 #include "game/render.hpp"
 #include "game/render_parts.hpp"
 #include "game/sim.hpp"
@@ -468,7 +469,7 @@ MissionsState g_missions;
 } // namespace
 
 int gallery_page_count() {
-    return 22;
+    return 23;
 }
 
 // Everything that renders into an offscreen target (ground textures, decals) happens here,
@@ -564,6 +565,28 @@ void render_gallery(Game& game, int page) {
     case 20:
         page_deaths(game);
         break;
+    case 22: {
+        backdrop("OMAR AND ALI  (idle / wave / cheer / ability + portraits)");
+        KidPose poses[] = {KidPose::Idle, KidPose::Wave, KidPose::Cheer, KidPose::Rally};
+        for (int i = 0; i < 4; ++i) {
+            KidPose p = i == 3 ? KidPose::Rally : poses[i];
+            draw_kid(game.gfx, Kid::Omar, {100.0f + static_cast<float>(i) * 170.0f, 330}, 2.2f, p, 0.4f);
+            KidPose q = i == 3 ? KidPose::Peace : poses[i];
+            draw_kid(game.gfx, Kid::Ali, {100.0f + static_cast<float>(i) * 170.0f, 700}, 2.2f, q, 0.4f);
+        }
+        label(game, "OMAR", 30, 360);
+        label(game, "ALI", 30, 730);
+        for (int i = 0; i < 2; ++i) {
+            draw_kid_portrait(game.gfx, Kid::Omar, {160.0f + static_cast<float>(i) * 140.0f, 900}, 56, 0.4f, i == 1);
+            draw_kid_portrait(game.gfx, Kid::Ali, {440.0f + static_cast<float>(i) * 140.0f, 900}, 56, 0.4f, i == 1);
+        }
+        for (int i = 0; i < 4; ++i) {
+            draw_kid(game.gfx, Kid::Omar, {120.0f + static_cast<float>(i) * 160.0f, 1180}, 1.0f, poses[i], 0.4f);
+            draw_kid(game.gfx, Kid::Ali, {170.0f + static_cast<float>(i) * 160.0f, 1180}, 1.0f,
+                     i == 3 ? KidPose::Peace : poses[i], 0.4f);
+        }
+        break;
+    }
     case 21: {
         // App icon source: a 512x512 square at the top-left of the canvas.
         ClearBackground(Color{20, 10, 14, 255});

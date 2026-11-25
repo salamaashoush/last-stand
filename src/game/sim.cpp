@@ -199,7 +199,7 @@ void damage_enemy(Ctx& c, int idx, float dmg, bool crit, bool status, float knoc
             e.burn_dps = std::max(e.burn_dps, s.burn_dps());
         }
         if (s.slow > 0.0f) {
-            e.slow_timer = 1.6f;
+            e.slow_timer = 3.0f;
             e.slow_factor = 1.0f - s.slow;
         }
     }
@@ -747,8 +747,9 @@ void update_bullets(Ctx& c, float dt) {
         b.prev = b.pos;
         b.pos += b.vel * dt;
         b.life -= dt;
+        // Squad bullets start behind the wall, so only cull ones heading down past it (shards).
         if (b.life <= 0.0f || b.pos.y < HUD_TOP - 40 || b.pos.x < -20 || b.pos.x > VIRTUAL_W + 20 ||
-            b.pos.y > WALL_BOTTOM) {
+            (b.vel.y > 0.0f && b.pos.y > WALL_BOTTOM)) {
             b.alive = false;
             continue;
         }
@@ -961,6 +962,12 @@ void update_enemies(Ctx& c, float dt) {
                 continue;
             }
         }
+        if (e.charm > 0.0f) {
+            // Charmed by Ali's peace sign: the monster stops to wave back and leaves the wall alone.
+            e.charm -= dt;
+            e.knock *= std::exp(-10.0f * dt);
+            continue;
+        }
         float speed = e.speed * (e.slow_timer > 0.0f ? e.slow_factor : 1.0f) * (e.dash > 0.0f ? 6.0f : 1.0f) *
                       (e.enraged ? 1.5f : 1.0f);
         e.pos.y -= e.knock * dt * 6.0f;
@@ -1002,7 +1009,7 @@ void update_enemies(Ctx& c, float dt) {
             }
         } else {
             if (e.pos.y < stop_line - 4.0f || run.collapse_t > 0.5f) e.at_wall = false;
-            float dps = e.wall_dps * (e.enraged ? 1.5f : 1.0f);
+            float dps = e.wall_dps * (e.enraged ? 1.5f : 1.0f) * (e.slow_timer > 0.0f ? e.slow_factor : 1.0f);
             damage_wall(c, dps * dt, {e.pos.x, WALL_TOP + 4});
             wall_sound += dps * dt;
         }
@@ -1198,6 +1205,7 @@ void apply_gate_to_squad(Ctx& c, Gate& g) {
         run.soldiers = was;
     }
     run.tally.gates_taken++;
+    run.ali_charge = std::min(1.0f, run.ali_charge + 0.12f);
     run.tally.max_soldiers = std::max(run.tally.max_soldiers, run.soldiers);
     run.soldier_pop = 1.0f;
     run.squad_x = clamp_squad_x(run.squad_x, visible_soldiers(run.soldiers));
@@ -1855,12 +1863,37 @@ void trigger_frenzy(Game& game) {
     run.frenzy_t = 6.0f;
     run.zoom_kick = 0.8f;
     run.flash = 0.35f;
-    run.banner = {"FRENZY!", "DOUBLE FIRE RATE", Color{255, 190, 50, 255}, 1.6f, 1.6f};
+    run.banner = {"OMAR'S RALLY!", "YALLA! DOUBLE FIRE RATE", Color{255, 190, 50, 255}, 1.6f, 1.6f};
     game.sound.play(Sfx::BossRoar, 0.7f, 1.6f);
     game.sound.play(Sfx::LevelUp, 0.8f, 0.8f);
     Vec2 at{run.squad_x, SQUAD_Y};
     for (int r = 0; r < 2; ++r)
         shockwave(run, at, 30.0f, 260.0f + 140.0f * static_cast<float>(r), 0.45f, Color{255, 190, 50, 220});
+}
+
+void trigger_ali(Game& game) {
+    auto& run = *game.run;
+    if (run.ali_charge < 1.0f || run.ali_t >= 0.0f || run.phase == WavePhase::Lost) return;
+    run.ali_charge = 0.0f;
+    run.ali_t = 0.0f;
+    run.banner = {"ALI'S PEACE SIGN!", "THE HORDE IS CHARMED", Color{255, 130, 170, 255}, 1.8f, 1.8f};
+    game.sound.play(Sfx::GateGood, 1.0f, 1.3f);
+    game.sound.play(Sfx::Gem, 0.9f, 0.8f);
+    for (auto& e : run.enemies) {
+        if (e.dead) continue;
+        e.charm = e.type == EnemyType::Boss ? 1.5f : 3.5f;
+    }
+    Vec2 at{VIRTUAL_W * 0.5f, WALL_TOP - 60};
+    for (int r = 0; r < 3; ++r) {
+        shockwave(run, at, 30.0f, 400.0f + 200.0f * static_cast<float>(r), 0.6f + 0.2f * static_cast<float>(r),
+                  Color{255, 140, 190, 200});
+    }
+    for (int i = 0; i < 30; ++i) {
+        float a = run.rng.uniform(-PI, 0.0f);
+        float sp = run.rng.uniform(200, 520);
+        additive_particle(run, at, {std::cos(a) * sp, std::sin(a) * sp}, run.rng.uniform(0.8f, 1.4f), 9.0f, 3.0f,
+                          i % 2 ? Color{255, 140, 190, 255} : Color{255, 230, 120, 255}, PStar, 1.5f);
+    }
 }
 
 void trigger_airstrike(Game& game) {
@@ -1937,6 +1970,12 @@ void update_run(Game& game, float real_dt) {
     run.shake = std::max(0.0f, run.shake - real_dt * 40.0f);
     run.wall_jolt = std::max(0.0f, run.wall_jolt - real_dt * 6.0f);
     run.frenzy_t = std::max(0.0f, run.frenzy_t - real_dt);
+    if (run.ali_t >= 0.0f) {
+        run.ali_t += real_dt;
+        if (run.ali_t > 2.2f) run.ali_t = -1.0f;
+    } else if (run.phase == WavePhase::Fighting) {
+        run.ali_charge = std::min(1.0f, run.ali_charge + real_dt / 45.0f);
+    }
     run.zoom_kick = std::max(0.0f, run.zoom_kick - real_dt * 2.5f);
     run.flash = std::max(0.0f, run.flash - real_dt * 2.0f);
     run.hint_timer = std::max(0.0f, run.hint_timer - real_dt);

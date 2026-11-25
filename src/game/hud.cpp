@@ -1,5 +1,6 @@
 #include "core/game.hpp"
 #include "game/formation.hpp"
+#include "game/kids.hpp"
 #include "game/render.hpp"
 #include "game/sim.hpp"
 #include "game/turrets.hpp"
@@ -386,7 +387,7 @@ void render_hud(Game& game) {
         float half = formation_half_width(visible);
         std::string label = std::format("{}", run.soldiers);
         float w = text_width(g, label, 30 * pop) + 44;
-        bool right = run.squad_x + half + w + 12 < VIRTUAL_W;
+        bool right = omar_x(run.squad_x, visible) < run.squad_x;
         float x = right ? run.squad_x + half + 8 : run.squad_x - half - 8 - w;
         float y = SQUAD_Y + 16;
         DrawRectangleRounded({x, y - 19 * pop, w, 38 * pop}, 0.5f, 6, Color{14, 22, 48, 230});
@@ -465,13 +466,13 @@ void render_hud(Game& game) {
     Color wc = wall_ratio > 0.5f    ? Color{120, 220, 120, 255}
                : wall_ratio > 0.25f ? Color{240, 200, 60, 255}
                                     : Color{240, 70, 60, 255};
-    bar({76, PANEL_TOP + 50, 250, 32}, wall_ratio, wc, Color{0, 0, 0, 160});
+    bar({76, PANEL_TOP + 50, 222, 32}, wall_ratio, wc, Color{0, 0, 0, 160});
     text(g, std::format("WALL  {:.0f} / {:.0f}", std::max(0.0f, run.wall_hp), run.stats.wall_max),
-         {201, PANEL_TOP + 67}, 17, WHITE);
+         {187, PANEL_TOP + 67}, 16, WHITE);
     {
         int cost = repair_cost(run);
         bool can = run.coins >= cost && wall_ratio < 1.0f && !run.picking && !game.paused;
-        if (button(game, {336, PANEL_TOP + 44, 140, 46}, std::format("REPAIR {}", cost),
+        if (button(game, {306, PANEL_TOP + 44, 124, 46}, std::format("FIX {}", cost),
                    can ? Color{60, 160, 90, 255} : Color{80, 80, 90, 255}, can, 20, KEY_R)) {
             repair_wall(game);
         }
@@ -499,7 +500,7 @@ void render_hud(Game& game) {
     }
     if (!game.touch_ui) key_badge(g, {ab.x, ab.y + 46}, "SPACE");
     {
-        Vec2 fb{540, PANEL_TOP + 50};
+        Vec2 fb{548, PANEL_TOP + 50};
         bool full = run.rage >= 1.0f && run.frenzy_t <= 0.0f;
         bool active = run.frenzy_t > 0.0f;
         if (full || active) {
@@ -507,20 +508,35 @@ void render_hud(Game& game) {
             glow(g, fb, 64 + 6 * std::sin(game.time * 8.0f), Color{255, 180, 40, 160});
             EndBlendMode();
         }
-        disc(g, fb, 34, Color{20, 20, 30, 230});
+        disc(g, fb, 31, Color{20, 20, 30, 230});
         float k = active ? run.frenzy_t / 6.0f : run.rage;
         DrawCircleSector(fb.to_raylib(), 32, -90, -90 + 360.0f * k, 40,
                          active ? Color{255, 120, 40, 255} : Color{255, 190, 50, 255});
         disc(g, fb, 25, full ? Color{230, 120, 30, 255} : Color{60, 50, 40, 255});
-        Color hot = full || active ? Color{255, 220, 120, 255} : Color{140, 130, 120, 255};
-        Color core = full || active ? Color{255, 250, 220, 255} : Color{170, 160, 150, 255};
-        float flick = full || active ? 1.0f + 0.08f * std::sin(game.time * 20.0f) : 1.0f;
-        DrawTriangle({fb.x, fb.y - 19 * flick}, {fb.x - 11, fb.y + 2}, {fb.x + 11, fb.y + 2}, hot);
-        disc(g, fb + Vec2{0, 5}, 11, hot);
-        DrawTriangle({fb.x, fb.y - 7 * flick}, {fb.x - 6, fb.y + 6}, {fb.x + 6, fb.y + 6}, core);
-        disc(g, fb + Vec2{0, 8}, 6, core);
+        BeginScissorMode(static_cast<int>(fb.x - 25), static_cast<int>(fb.y - 25), 50, 50);
+        draw_kid_portrait(g, Kid::Omar, fb + Vec2{0, 2}, 26, game.time, full || active);
+        EndScissorMode();
+        if (!full && !active) disc(g, fb, 25, Color{20, 20, 30, 120});
         if (!game.touch_ui) key_badge(g, {fb.x + 26, fb.y - 26}, "E");
-        if (full && !run.picking && !game.paused && hit(game, {fb.x - 34, fb.y - 34, 68, 68})) trigger_frenzy(game);
+        if (full && !run.picking && !game.paused && hit(game, {fb.x - 32, fb.y - 32, 64, 64})) trigger_frenzy(game);
+    }
+    {
+        Vec2 ab2{474, PANEL_TOP + 50};
+        bool full = run.ali_charge >= 1.0f && run.ali_t < 0.0f;
+        if (full) {
+            BeginBlendMode(BLEND_ADDITIVE);
+            glow(g, ab2, 60 + 6 * std::sin(game.time * 8.0f), Color{255, 130, 190, 150});
+            EndBlendMode();
+        }
+        disc(g, ab2, 31, Color{20, 20, 30, 230});
+        DrawCircleSector(ab2.to_raylib(), 30, -90, -90 + 360.0f * run.ali_charge, 40, Color{255, 140, 190, 255});
+        disc(g, ab2, 25, full ? Color{230, 110, 160, 255} : Color{60, 46, 56, 255});
+        BeginScissorMode(static_cast<int>(ab2.x - 25), static_cast<int>(ab2.y - 25), 50, 50);
+        draw_kid_portrait(g, Kid::Ali, ab2 + Vec2{0, 2}, 26, game.time, full);
+        EndScissorMode();
+        if (!full) disc(g, ab2, 25, Color{20, 20, 30, 120});
+        if (!game.touch_ui) key_badge(g, {ab2.x + 24, ab2.y - 26}, "Q");
+        if (full && !run.picking && !game.paused && hit(game, {ab2.x - 32, ab2.y - 32, 64, 64})) trigger_ali(game);
     }
     if (run.frenzy_t > 0.0f) {
         float a = 0.5f + 0.5f * std::sin(game.time * 10.0f);
