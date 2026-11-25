@@ -57,6 +57,7 @@ void Game::update_input() {
     if (GetTouchPointCount() > 0) {
         raw = GetTouchPosition(0);
         down = true;
+        touch_ui = true;
     }
     Vec2 prev = input.pos;
     input.pos = {(raw.x - viewport.x) / scale, (raw.y - viewport.y) / scale};

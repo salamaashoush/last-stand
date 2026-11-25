@@ -253,7 +253,7 @@ void draw_cards(Game& game) {
             DrawRectangleRoundedLinesEx({rr.x - 6, rr.y - 6, rr.width + 12, rr.height + 12}, 0.12f, 8, 5.0f,
                                         Color{255, 230, 120, static_cast<unsigned char>(160 + 95 * pulse)});
         }
-        key_badge(g, {center.x, rr.y + rr.height + 22}, i == 0 ? "1" : i == 1 ? "2" : "3");
+        if (!game.touch_ui) key_badge(g, {center.x, rr.y + rr.height + 22}, i == 0 ? "1" : i == 1 ? "2" : "3");
         if (k > 0.9f && (hit(game, r) || (focused && IsKeyPressed(KEY_ENTER)))) {
             pick_card(game, i);
             return;
@@ -497,7 +497,7 @@ void render_hud(Game& game) {
         DrawTexturePro(*pl, {0, 0, static_cast<float>(pl->width), static_cast<float>(pl->height)}, {ab.x, ab.y, 60, 60},
                        {30, 30}, 0, WHITE);
     }
-    key_badge(g, {ab.x, ab.y + 46}, "SPACE");
+    if (!game.touch_ui) key_badge(g, {ab.x, ab.y + 46}, "SPACE");
     {
         Vec2 fb{58, 1128};
         bool full = run.rage >= 1.0f && run.frenzy_t <= 0.0f;
@@ -519,7 +519,7 @@ void render_hud(Game& game) {
         disc(g, fb + Vec2{0, 5}, 11, hot);
         DrawTriangle({fb.x, fb.y - 7 * flick}, {fb.x - 6, fb.y + 6}, {fb.x + 6, fb.y + 6}, core);
         disc(g, fb + Vec2{0, 8}, 6, core);
-        key_badge(g, {fb.x + 26, fb.y - 26}, "E");
+        if (!game.touch_ui) key_badge(g, {fb.x + 26, fb.y - 26}, "E");
         if (full && !run.picking && !game.paused && hit(game, {fb.x - 34, fb.y - 34, 68, 68})) trigger_frenzy(game);
     }
     if (run.frenzy_t > 0.0f) {
@@ -531,7 +531,8 @@ void render_hud(Game& game) {
 
     if (!run.picking && !game.paused && run.collapse_t < 0.0f) {
         for (int s = 0; s < TURRET_SLOTS; ++s) {
-            key_badge(g, {TURRET_SLOT_X[s] + 30, TURRET_Y - 30}, s == 0 ? "1" : s == 1 ? "2" : s == 2 ? "3" : "4");
+            if (!game.touch_ui)
+                key_badge(g, {TURRET_SLOT_X[s] + 30, TURRET_Y - 30}, s == 0 ? "1" : s == 1 ? "2" : s == 2 ? "3" : "4");
             if (s == run.build_slot) continue;
             if (hit(game, {TURRET_SLOT_X[s] - 40, TURRET_Y - 40, 80, 80})) {
                 run.build_slot = s;
@@ -556,12 +557,14 @@ void render_hud(Game& game) {
         Rectangle r{60, 700, 600, 110};
         DrawRectangleRounded(r, 0.25f, 8, Color{10, 10, 30, static_cast<unsigned char>(200 * a)});
         DrawRectangleRoundedLinesEx(r, 0.25f, 8, 3, with_alpha(GOLD_TINT, a));
-        auto nl = run.hint.find('\n');
+        std::string hint = run.hint;
+        if (game.touch_ui && hint.starts_with("DRAG,")) hint = "DRAG LEFT AND RIGHT TO MOVE";
+        auto nl = hint.find('\n');
         if (nl == std::string::npos) {
-            text(g, run.hint, {360, 755}, 24, with_alpha(WHITE, a));
+            text(g, hint, {360, 755}, 24, with_alpha(WHITE, a));
         } else {
-            text(g, run.hint.substr(0, nl), {360, 738}, 24, with_alpha(WHITE, a));
-            text(g, run.hint.substr(nl + 1), {360, 772}, 24, with_alpha(WHITE, a));
+            text(g, hint.substr(0, nl), {360, 738}, 24, with_alpha(WHITE, a));
+            text(g, hint.substr(nl + 1), {360, 772}, 24, with_alpha(WHITE, a));
         }
         if (run.hint.starts_with("DRAG,")) {
             float hx = run.squad_x + std::sin(game.time * 3.0f) * 120.0f;

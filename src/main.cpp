@@ -15,6 +15,7 @@
 namespace {
 
 ls::Game* g_game = nullptr;
+bool g_game_touch = false;
 
 void draw_toasts(ls::Game& game, float dt) {
     float y = 120.0f;
@@ -46,8 +47,22 @@ void capture_if_requested(ls::Game& game) {
     UnloadImage(img);
 }
 
+#ifdef __EMSCRIPTEN__
+// Render at the screen's real pixel density (capped) so phones get a sharp image; touch and
+// mouse input are already scaled by raylib from CSS pixels to canvas pixels.
+void fit_canvas() {
+    double dpr = std::min(EM_ASM_DOUBLE({ return window.devicePixelRatio || 1; }), 2.5);
+    int w = static_cast<int>(EM_ASM_INT({ return window.innerWidth; }) * dpr);
+    int h = static_cast<int>(EM_ASM_INT({ return window.innerHeight; }) * dpr);
+    if (w > 0 && h > 0 && (w != GetScreenWidth() || h != GetScreenHeight())) SetWindowSize(w, h);
+}
+#endif
+
 void frame() {
     auto& game = *g_game;
+#ifdef __EMSCRIPTEN__
+    fit_canvas();
+#endif
     float dt = std::min(GetFrameTime(), 1.0f / 20.0f);
     game.time += dt;
     game.update_input();
@@ -60,9 +75,26 @@ void frame() {
     draw_toasts(game, dt);
     EndTextureMode();
 
+    Rectangle src{0, 0, static_cast<float>(game.canvas.texture.width), -static_cast<float>(game.canvas.texture.height)};
+    static RenderTexture2D blur = [] {
+        RenderTexture2D t = LoadRenderTexture(18, 32);
+        SetTextureFilter(t.texture, TEXTURE_FILTER_BILINEAR);
+        return t;
+    }();
+    BeginTextureMode(blur);
+    DrawTexturePro(game.canvas.texture, src, {0, 0, 18, 32}, {0, 0}, 0.0f, WHITE);
+    EndTextureMode();
+
     BeginDrawing();
     ClearBackground(Color{6, 6, 12, 255});
-    Rectangle src{0, 0, static_cast<float>(game.canvas.texture.width), -static_cast<float>(game.canvas.texture.height)};
+    // Letterbox bars show a dimmed, heavily blurred copy of the scene instead of flat black.
+    float sw = static_cast<float>(GetScreenWidth());
+    float sh = static_cast<float>(GetScreenHeight());
+    float cover = std::max(sw / ls::VIRTUAL_W, sh / ls::VIRTUAL_H) * 1.15f;
+    Rectangle bg{(sw - ls::VIRTUAL_W * cover) * 0.5f, (sh - ls::VIRTUAL_H * cover) * 0.5f, ls::VIRTUAL_W * cover,
+                 ls::VIRTUAL_H * cover};
+    Rectangle blur_src{0, 0, 18, -32};
+    DrawTexturePro(blur.texture, blur_src, bg, {0, 0}, 0.0f, Color{80, 80, 92, 255});
     DrawTexturePro(game.canvas.texture, src, game.viewport, {0, 0}, 0.0f, WHITE);
     if (std::getenv("LS_DEBUG_SIZE")) {
         static int n = 0;
@@ -100,7 +132,8 @@ int main() {
 #endif
     InitWindow(540, 960, "Last Stand - Horde Defense");
 #ifdef __EMSCRIPTEN__
-    SetWindowSize(EM_ASM_INT({ return window.innerWidth; }), EM_ASM_INT({ return window.innerHeight; }));
+    fit_canvas();
+    g_game_touch = EM_ASM_INT({ return window.matchMedia('(pointer: coarse)').matches ? 1 : 0; }) != 0;
 #else
     int monitor = GetCurrentMonitor();
     int h = std::min(1100, static_cast<int>(static_cast<float>(GetMonitorHeight(monitor)) * 0.85f));
@@ -121,6 +154,7 @@ int main() {
     game->sound.init();
     ls::load_assets(*game);
     game->load();
+    game->touch_ui = g_game_touch;
 
     game->states.register_state<ls::MenuState>();
     game->states.register_state<ls::PlayingState>();

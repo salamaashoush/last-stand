@@ -213,7 +213,7 @@ bool button(Game& game, Rectangle r, std::string_view label, Color color, bool e
         DrawRectangleRoundedLinesEx({body.x - 5, body.y - 5, body.width + 10, body.height + 10}, 0.35f, 8, 4.0f,
                                     Color{255, 230, 120, static_cast<unsigned char>(160 + 95 * pulse)});
     }
-    if (key != 0) key_badge(game.gfx, {body.x + body.width - 8, body.y + 2}, key_name(key));
+    if (key != 0 && !game.touch_ui) key_badge(game.gfx, {body.x + body.width - 8, body.y + 2}, key_name(key));
     if (!enabled) return false;
     if (key != 0 && IsKeyPressed(key)) {
         game.sound.play(Sfx::Click, 0.7f);

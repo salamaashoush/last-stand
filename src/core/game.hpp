@@ -64,6 +64,7 @@ struct Game {
     bool running{true};
     bool paused{false};
     bool persist{true};
+    bool touch_ui{false};
 
     void save();
     void load();

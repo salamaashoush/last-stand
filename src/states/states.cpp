@@ -455,7 +455,7 @@ void ArmoryState::render(Game& game) {
     int rows = tab_ == 0 ? META_COUNT : UNIT_COUNT;
     if (IsKeyPressed(KEY_DOWN)) focus_ = (focus_ + 1) % rows;
     if (IsKeyPressed(KEY_UP)) focus_ = (focus_ + rows - 1) % rows;
-    key_badge(g, {380, 186}, "TAB");
+    if (!game.touch_ui) key_badge(g, {380, 186}, "TAB");
     const char* tabs[2] = {"UPGRADES", "UNITS"};
     for (int i = 0; i < 2; ++i) {
         Rectangle r{60.0f + static_cast<float>(i) * 310.0f, 200, 290, 70};
