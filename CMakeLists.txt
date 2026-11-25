@@ -60,7 +60,10 @@ if(EMSCRIPTEN)
     target_compile_options(${PROJECT_NAME} PRIVATE
         -Wall -Wextra -Wpedantic -fexperimental-library
     )
-    set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
+    set_target_properties(${PROJECT_NAME} PROPERTIES
+        SUFFIX ".html"
+        LINK_DEPENDS ${CMAKE_SOURCE_DIR}/web/shell.html
+    )
     add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy
             ${CMAKE_SOURCE_DIR}/web/manifest.webmanifest
