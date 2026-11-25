@@ -457,7 +457,7 @@ void render_hud(Game& game) {
     DrawRectangleGradientV(0, static_cast<int>(PANEL_TOP), VIRTUAL_W, static_cast<int>(VIRTUAL_H - PANEL_TOP),
                            Color{10, 10, 20, 150}, Color{10, 10, 20, 230});
     float xp_ratio = static_cast<float>(run.xp) / static_cast<float>(xp_for_level(run.level));
-    bar({76, PANEL_TOP + 14, 504, 20}, xp_ratio, Color{90, 200, 255, 255}, Color{0, 0, 0, 160});
+    bar({76, PANEL_TOP + 14, 400, 20}, xp_ratio, Color{90, 200, 255, 255}, Color{0, 0, 0, 160});
     disc(g, {46, PANEL_TOP + 24}, 26, Color{20, 60, 110, 255});
     disc(g, {46, PANEL_TOP + 24}, 22, Color{60, 150, 230, 255});
     text(g, std::format("{}", run.level), {46, PANEL_TOP + 25}, 24, WHITE);
@@ -465,13 +465,13 @@ void render_hud(Game& game) {
     Color wc = wall_ratio > 0.5f    ? Color{120, 220, 120, 255}
                : wall_ratio > 0.25f ? Color{240, 200, 60, 255}
                                     : Color{240, 70, 60, 255};
-    bar({76, PANEL_TOP + 50, 330, 32}, wall_ratio, wc, Color{0, 0, 0, 160});
+    bar({76, PANEL_TOP + 50, 250, 32}, wall_ratio, wc, Color{0, 0, 0, 160});
     text(g, std::format("WALL  {:.0f} / {:.0f}", std::max(0.0f, run.wall_hp), run.stats.wall_max),
-         {241, PANEL_TOP + 67}, 19, WHITE);
+         {201, PANEL_TOP + 67}, 17, WHITE);
     {
         int cost = repair_cost(run);
         bool can = run.coins >= cost && wall_ratio < 1.0f && !run.picking && !game.paused;
-        if (button(game, {418, PANEL_TOP + 44, 162, 46}, std::format("REPAIR {}", cost),
+        if (button(game, {336, PANEL_TOP + 44, 140, 46}, std::format("REPAIR {}", cost),
                    can ? Color{60, 160, 90, 255} : Color{80, 80, 90, 255}, can, 20, KEY_R)) {
             repair_wall(game);
         }
@@ -499,7 +499,7 @@ void render_hud(Game& game) {
     }
     if (!game.touch_ui) key_badge(g, {ab.x, ab.y + 46}, "SPACE");
     {
-        Vec2 fb{58, 1128};
+        Vec2 fb{540, PANEL_TOP + 50};
         bool full = run.rage >= 1.0f && run.frenzy_t <= 0.0f;
         bool active = run.frenzy_t > 0.0f;
         if (full || active) {

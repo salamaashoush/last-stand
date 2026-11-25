@@ -52,8 +52,8 @@ void capture_if_requested(ls::Game& game) {
 // mouse input are already scaled by raylib from CSS pixels to canvas pixels.
 void fit_canvas() {
     double dpr = std::min(EM_ASM_DOUBLE({ return window.devicePixelRatio || 1; }), 2.5);
-    int w = static_cast<int>(EM_ASM_INT({ return window.innerWidth; }) * dpr);
-    int h = static_cast<int>(EM_ASM_INT({ return window.innerHeight; }) * dpr);
+    int w = static_cast<int>(EM_ASM_DOUBLE({ return Module.canvas.getBoundingClientRect().width; }) * dpr);
+    int h = static_cast<int>(EM_ASM_DOUBLE({ return Module.canvas.getBoundingClientRect().height; }) * dpr);
     if (w > 0 && h > 0 && (w != GetScreenWidth() || h != GetScreenHeight())) SetWindowSize(w, h);
 }
 #endif

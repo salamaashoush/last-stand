@@ -468,7 +468,7 @@ MissionsState g_missions;
 } // namespace
 
 int gallery_page_count() {
-    return 21;
+    return 22;
 }
 
 // Everything that renders into an offscreen target (ground textures, decals) happens here,
@@ -564,6 +564,20 @@ void render_gallery(Game& game, int page) {
     case 20:
         page_deaths(game);
         break;
+    case 21: {
+        // App icon source: a 512x512 square at the top-left of the canvas.
+        ClearBackground(Color{20, 10, 14, 255});
+        DrawRectangleGradientV(0, 0, 512, 512, Color{90, 30, 20, 255}, Color{20, 8, 12, 255});
+        BeginBlendMode(BLEND_ADDITIVE);
+        glow(game.gfx, {256, 270}, 330, Color{255, 120, 40, 140});
+        EndBlendMode();
+        BossGenome icon = make_boss(5, false);
+        icon.crown = true;
+        icon.horns = 2;
+        icon.eyes = 2;
+        draw_boss(game.gfx, icon, 3, {256, 290}, 150, 0.3f, 0.0f, true, game.time, 0.0f);
+        break;
+    }
     case 7:
     case 8:
     case 9:

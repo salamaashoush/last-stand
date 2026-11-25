@@ -61,6 +61,13 @@ if(EMSCRIPTEN)
         -Wall -Wextra -Wpedantic -fexperimental-library
     )
     set_target_properties(${PROJECT_NAME} PROPERTIES SUFFIX ".html")
+    add_custom_command(TARGET ${PROJECT_NAME} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy
+            ${CMAKE_SOURCE_DIR}/web/manifest.webmanifest
+            ${CMAKE_SOURCE_DIR}/web/icon-192.png
+            ${CMAKE_SOURCE_DIR}/web/icon-512.png
+            $<TARGET_FILE_DIR:${PROJECT_NAME}>
+    )
     target_link_options(${PROJECT_NAME} PRIVATE
         "SHELL:-s USE_GLFW=3"
         "SHELL:-s WASM=1"

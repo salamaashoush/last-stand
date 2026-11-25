@@ -4,6 +4,11 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    <link rel="icon" type="image/png" href="icon-192.png">
     <meta name="theme-color" content="#06060c">
     <title>Last Stand - Horde Defense</title>
     <style>
@@ -18,10 +23,18 @@
             user-select: none;
             -webkit-touch-callout: none;
         }
+        /* 100vh on mobile Chrome is the height with the toolbar hidden, which pushed the
+           squad under the browser's bottom bar. dvh tracks the visible area, and the safe-area
+           insets keep the HUD clear of notches and the home indicator. */
         canvas {
             display: block;
+            position: fixed;
+            left: 0;
+            right: 0;
+            top: env(safe-area-inset-top, 0px);
             width: 100vw;
-            height: 100vh;
+            height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+            height: calc(100dvh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
             outline: none;
         }
         #loading {
@@ -118,6 +131,24 @@
             document.addEventListener(e, resumeAudio);
         });
         document.addEventListener('pointerdown', function() { Module.canvas.focus(); });
+
+        // Phones get the whole screen: the first tap asks for fullscreen (Android Chrome and
+        // friends honour it) and locks portrait. iOS Safari ignores both; installing the page
+        // to the home screen gives it fullscreen through the manifest instead.
+        var askedFullscreen = false;
+        document.addEventListener('pointerdown', function() {
+            if (askedFullscreen || !window.matchMedia('(pointer: coarse)').matches) return;
+            askedFullscreen = true;
+            var el = document.documentElement;
+            var request = el.requestFullscreen || el.webkitRequestFullscreen;
+            if (!request) return;
+            var done = request.call(el, { navigationUI: 'hide' });
+            if (done && done.then) {
+                done.then(function() {
+                    if (screen.orientation && screen.orientation.lock) screen.orientation.lock('portrait').catch(function() {});
+                }).catch(function() {});
+            }
+        });
     </script>
     {{{ SCRIPT }}}
 </body>
