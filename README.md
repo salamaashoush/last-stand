@@ -28,6 +28,10 @@ browser (mouse, touch or keyboard).
 - **Level up mid-run.** Kills give XP; each level offers three cards (multishot, ricochet, incendiary,
   chain lightning, airstrikes, call in a new unit type and more). Pairs of cards evolve into
   Bullet Storm, Inferno, Thunder God and Shatter.
+- **Frenzy.** Kills charge a meter; unleash it for six seconds of double fire rate.
+- **Barrels and bats.** Explosive barrels drift with the horde and wipe out everything near them
+  when shot; bat swarms weave fast over the field.
+- **Stat gates.** Some lanes are FIRE RATE or DAMAGE gates that follow the same blue and red rule.
 - **Build the wall up.** Four turret slots take cannons, tesla coils, flamers and railbeams, each
   upgradable five times. Coins also repair the wall.
 - **Six units.** Rifleman, Gunner, Shotgunner, Sniper, Grenadier and Flamer, each with its own gun and
@@ -54,16 +58,17 @@ supply drop with a streak, and an endless mode after stage 3 give the long game.
 
 ## Controls
 
-Everything works with the mouse or touch. On a keyboard:
+Everything works with the mouse or touch. Keyboard shortcuts are listed below.
 
-- **Move squad:** A / D or Left / Right
-- **Airstrike:** Space
-- **Turret slots:** 1 to 4, then Up / Down and Enter to build, S to sell, Esc to close
-- **Repair wall:** R
-- **Upgrade cards:** 1 / 2 / 3, or Left / Right and Enter
-- **Pause:** Esc or P
+- **Move squad:** A / D or Left / Right.
+- **Airstrike:** Space.
+- **Frenzy** (when the meter is full): E.
+- **Turret slots:** 1 to 4, then Up / Down and Enter to build, S to sell, Esc to close.
+- **Repair wall:** R.
+- **Upgrade cards:** 1 / 2 / 3, or Left / Right and Enter.
+- **Pause:** Esc or P.
 - **Menus:** Enter plays or confirms, Left / Right picks a stage, A opens the Armory, M the missions,
-  Tab switches Armory tabs, Up / Down and Enter buy, F fields or benches a unit
+  Tab switches Armory tabs, Up / Down and Enter buy, F fields or benches a unit.
 
 ## Building
 

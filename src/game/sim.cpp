@@ -257,6 +257,7 @@ void kill_enemy(Ctx& c, int idx) {
     auto d = difficulty_for(run);
 
     run.tally.kills++;
+    if (run.frenzy_t <= 0.0f) run.rage = std::min(1.0f, run.rage + (type == EnemyType::Boss ? 0.25f : 0.004f));
     run.combo++;
     run.combo_timer = 2.2f;
     run.tally.max_combo = std::max(run.tally.max_combo, run.combo);
@@ -526,7 +527,7 @@ void fire_squad(Ctx& c, float dt) {
         int count = unit_soldiers(run, slot);
         if (count <= 0) continue;
         auto& accum = run.fire_accum_by_unit[static_cast<size_t>(u)];
-        accum += static_cast<float>(count) * unit_shot_rate(run, u) * dt;
+        accum += static_cast<float>(count) * unit_shot_rate(run, u) * dt * (run.frenzy_t > 0.0f ? 2.0f : 1.0f);
         float level_dmg = unit_damage_mult(run.unit_levels[static_cast<size_t>(u)]);
         while (accum >= 1.0f) {
             accum -= 1.0f;
@@ -535,7 +536,8 @@ void fire_squad(Ctx& c, float dt) {
             if (si >= visible) si = static_cast<int>(slot);
             Vec2 origin = Vec2{run.squad_x, SQUAD_Y} + soldier_offset(si, visible) + muzzle_offset(static_cast<int>(u));
             run.soldier_recoil[static_cast<size_t>(si)] = 1.0f;
-            float base_dmg = run.stats.damage * def.damage_mult * level_dmg * over;
+            float base_dmg =
+                run.stats.damage * def.damage_mult * level_dmg * over * (run.frenzy_t > 0.0f ? 1.25f : 1.0f);
 
             if (def.shot == Shot::Grenade) {
                 auto [ang, target] = aim_for(origin, 900.0f);
@@ -1846,6 +1848,21 @@ void repair_wall(Game& game) {
     float_text(run, "+20% WALL", {VIRTUAL_W * 0.5f, WALL_TOP - 30}, Color{120, 255, 150, 255}, 34.0f);
 }
 
+void trigger_frenzy(Game& game) {
+    auto& run = *game.run;
+    if (run.rage < 1.0f || run.frenzy_t > 0.0f || run.phase == WavePhase::Lost) return;
+    run.rage = 0.0f;
+    run.frenzy_t = 6.0f;
+    run.zoom_kick = 0.8f;
+    run.flash = 0.35f;
+    run.banner = {"FRENZY!", "DOUBLE FIRE RATE", Color{255, 190, 50, 255}, 1.6f, 1.6f};
+    game.sound.play(Sfx::BossRoar, 0.7f, 1.6f);
+    game.sound.play(Sfx::LevelUp, 0.8f, 0.8f);
+    Vec2 at{run.squad_x, SQUAD_Y};
+    for (int r = 0; r < 2; ++r)
+        shockwave(run, at, 30.0f, 260.0f + 140.0f * static_cast<float>(r), 0.45f, Color{255, 190, 50, 220});
+}
+
 void trigger_airstrike(Game& game) {
     auto& run = *game.run;
     if (run.airstrike_cd > 0.0f || run.plane_t >= 0.0f) return;
@@ -1919,6 +1936,7 @@ void update_run(Game& game, float real_dt) {
 
     run.shake = std::max(0.0f, run.shake - real_dt * 40.0f);
     run.wall_jolt = std::max(0.0f, run.wall_jolt - real_dt * 6.0f);
+    run.frenzy_t = std::max(0.0f, run.frenzy_t - real_dt);
     run.zoom_kick = std::max(0.0f, run.zoom_kick - real_dt * 2.5f);
     run.flash = std::max(0.0f, run.flash - real_dt * 2.0f);
     run.hint_timer = std::max(0.0f, run.hint_timer - real_dt);
@@ -1950,6 +1968,16 @@ void update_run(Game& game, float real_dt) {
     run.squad_x += (run.squad_target_x - run.squad_x) * std::min(1.0f, real_dt * 14.0f);
     run.squad_x = clamp_squad_x(run.squad_x, visible);
     for (auto& r : run.soldier_recoil) r = std::max(0.0f, r - real_dt * 8.0f);
+    for (auto& j : run.soldier_join) j = std::max(0.0f, j - real_dt * 2.5f);
+    // New formation slots drop in with a bounce and a puff of dust.
+    if (visible > run.shown_soldiers) {
+        for (int i = run.shown_soldiers; i < visible; ++i) {
+            run.soldier_join[static_cast<size_t>(i)] = 1.0f + static_cast<float>(i - run.shown_soldiers) * 0.04f;
+            Vec2 p = Vec2{run.squad_x, SQUAD_Y} + soldier_offset(i, visible);
+            particle(run, p + Vec2{0, 8}, {0, 0}, 0.4f, 6.0f, 18.0f, Color{200, 190, 170, 150}, PSmoke, 0.0f);
+        }
+    }
+    run.shown_soldiers = visible;
     run.wall_flash = std::max(0.0f, run.wall_flash - real_dt);
 
     if (run.combo_timer > 0.0f) {

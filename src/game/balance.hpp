@@ -69,11 +69,11 @@ inline EnemyStats base_stats(EnemyType t) {
     return {1, 1, 1, 0, 0, 0, 0};
 }
 
-// Stage 1 is a gentle on-ramp and stage 2 eases into the 1.45x-per-stage curve.
+// Stage 1 is a gentle on-ramp and stage 2 eases into the 1.5x-per-stage curve.
 inline float stage_hp_mult(int stage) {
-    if (stage <= 1) return 0.8f;
-    if (stage == 2) return 1.3f;
-    return 1.6f * std::pow(1.45f, static_cast<float>(stage - 3));
+    if (stage <= 1) return 0.95f;
+    if (stage == 2) return 1.5f;
+    return 1.85f * std::pow(1.5f, static_cast<float>(stage - 3));
 }
 
 inline float wave_hp_mult(int wave) {

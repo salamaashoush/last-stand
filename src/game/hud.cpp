@@ -498,6 +498,35 @@ void render_hud(Game& game) {
                        {30, 30}, 0, WHITE);
     }
     key_badge(g, {ab.x, ab.y + 46}, "SPACE");
+    {
+        Vec2 fb{58, 1128};
+        bool full = run.rage >= 1.0f && run.frenzy_t <= 0.0f;
+        bool active = run.frenzy_t > 0.0f;
+        if (full || active) {
+            BeginBlendMode(BLEND_ADDITIVE);
+            glow(g, fb, 64 + 6 * std::sin(game.time * 8.0f), Color{255, 180, 40, 160});
+            EndBlendMode();
+        }
+        disc(g, fb, 34, Color{20, 20, 30, 230});
+        float k = active ? run.frenzy_t / 6.0f : run.rage;
+        DrawCircleSector(fb.to_raylib(), 32, -90, -90 + 360.0f * k, 40,
+                         active ? Color{255, 120, 40, 255} : Color{255, 190, 50, 255});
+        disc(g, fb, 25, full ? Color{230, 120, 30, 255} : Color{60, 50, 40, 255});
+        Color hot = full || active ? Color{255, 220, 120, 255} : Color{140, 130, 120, 255};
+        Color core = full || active ? Color{255, 250, 220, 255} : Color{170, 160, 150, 255};
+        float flick = full || active ? 1.0f + 0.08f * std::sin(game.time * 20.0f) : 1.0f;
+        DrawTriangle({fb.x, fb.y - 19 * flick}, {fb.x - 11, fb.y + 2}, {fb.x + 11, fb.y + 2}, hot);
+        disc(g, fb + Vec2{0, 5}, 11, hot);
+        DrawTriangle({fb.x, fb.y - 7 * flick}, {fb.x - 6, fb.y + 6}, {fb.x + 6, fb.y + 6}, core);
+        disc(g, fb + Vec2{0, 8}, 6, core);
+        key_badge(g, {fb.x + 26, fb.y - 26}, "E");
+        if (full && !run.picking && !game.paused && hit(game, {fb.x - 34, fb.y - 34, 68, 68})) trigger_frenzy(game);
+    }
+    if (run.frenzy_t > 0.0f) {
+        float a = 0.5f + 0.5f * std::sin(game.time * 10.0f);
+        DrawRectangleLinesEx({0, 0, static_cast<float>(VIRTUAL_W), static_cast<float>(VIRTUAL_H)}, 10,
+                             Color{255, 170, 40, static_cast<unsigned char>(90 + 80 * a)});
+    }
     if (!run.picking && !game.paused && ready && hit(game, {ab.x - 46, ab.y - 46, 92, 92})) trigger_airstrike(game);
 
     if (!run.picking && !game.paused && run.collapse_t < 0.0f) {

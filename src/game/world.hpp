@@ -300,6 +300,8 @@ struct Run {
     float fire_accum{};
     int fire_cursor{};
     std::array<float, 64> soldier_recoil{};
+    std::array<float, 64> soldier_join{};
+    int shown_soldiers{0};
 
     float wall_hp{1000};
     float wall_flash{};
@@ -312,6 +314,8 @@ struct Run {
     std::array<CardId, 3> offer{};
     int rerolls{};
     float airstrike_cd{8.0f};
+    float rage{};
+    float frenzy_t{};
     float chain_timer{};
     std::array<Turret, TURRET_SLOTS> turrets{};
     int build_slot{-1};

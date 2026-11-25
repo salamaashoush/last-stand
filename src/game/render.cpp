@@ -2286,8 +2286,12 @@ void render_world(Game& game) {
         float bob = std::sin(game.time * 10.0f + static_cast<float>(i)) *
                     (std::abs(run.squad_target_x - run.squad_x) > 4 ? 2.0f : 0.0f);
         UnitType u = run.squad[static_cast<size_t>(i) % run.squad.size()];
-        draw_soldier(g, p + Vec2{0, bob}, run.soldier_recoil[static_cast<size_t>(i)], u, SOLDIER_SCALE, game.time,
-                     run.theme.biome);
+        float join = std::min(1.0f, run.soldier_join[static_cast<size_t>(i)]);
+        float drop = join > 0.0f ? -std::sin(join * PI * 0.5f) * 60.0f : 0.0f;
+        float pop = join > 0.0f ? 1.0f + 0.35f * std::sin(join * PI) : 1.0f;
+        if (join > 0.0f) ellipse(g, p + Vec2{0, 9}, 11.0f * (1.0f - join * 0.6f), 4.0f, Color{0, 0, 0, 60});
+        draw_soldier(g, p + Vec2{0, bob + drop}, run.soldier_recoil[static_cast<size_t>(i)], u, SOLDIER_SCALE * pop,
+                     game.time, run.theme.biome);
     }
     draw_corpses(game, run);
     if (run.collapse_t >= 0.0f) draw_wall_collapse(run, g);

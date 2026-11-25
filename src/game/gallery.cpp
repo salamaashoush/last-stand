@@ -492,6 +492,10 @@ void gallery_prepare(Game& game, int page) {
             game.run->pick_anim = 2.0f;
         }
         if (page == 9) game.run->build_slot = 2;
+        if (page == 7) {
+            game.run->rage = 1.0f;
+            for (int i = 0; i < 8; ++i) game.run->soldier_join[static_cast<size_t>(i)] = 0.5f;
+        }
         break;
     case 10:
         g_menu.enter(game);

@@ -303,6 +303,7 @@ void PlayingState::update(Game& game, float dt) {
         if (IsKeyDown(KEY_D) || IsKeyDown(KEY_RIGHT)) dir += 1.0f;
         run.squad_target_x += dir * 720.0f * dt;
         if (IsKeyPressed(KEY_SPACE)) trigger_airstrike(game);
+        if (IsKeyPressed(KEY_E)) trigger_frenzy(game);
         for (int s = 0; s < TURRET_SLOTS; ++s) {
             if (IsKeyPressed(KEY_ONE + s)) {
                 run.build_slot = run.build_slot == s ? -1 : s;

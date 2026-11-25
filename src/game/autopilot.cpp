@@ -105,6 +105,7 @@ void autopilot_update(Game& game, float dt) {
     }
 
     trigger_airstrike(game);
+    trigger_frenzy(game);
     if (run.wall_hp < run.stats.wall_max * 0.75f) repair_wall(game);
 
     static const TurretType order[TURRET_SLOTS] = {TurretType::Cannon, TurretType::Tesla, TurretType::Flamer,
