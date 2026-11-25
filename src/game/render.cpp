@@ -149,11 +149,94 @@ void jagged_mouth(const Gfx& g, Vec2 m, float w, float h, Color outline, Color i
     }
 }
 
+void draw_barrel(const Gfx& g, Vec2 p, float r, float flash, float hp_ratio, float time) {
+    Color red{196, 52, 36, 255};
+    Color dark{90, 20, 14, 255};
+    Color hoop{70, 66, 70, 255};
+    ellipse(g, p + Vec2{0, r * 0.95f}, r * 0.95f, r * 0.32f, Color{0, 0, 0, 90});
+    if (hp_ratio < 0.99f)
+        glow(g, p, r * 2.4f, Color{255, 140, 40, static_cast<unsigned char>(60 + 60 * std::sin(time * 14.0f))});
+    Rectangle body{p.x - r * 0.8f, p.y - r * 0.75f, r * 1.6f, r * 1.6f};
+    DrawRectangleRounded({body.x - 2.5f, body.y - 2.5f, body.width + 5, body.height + 5}, 0.35f, 6,
+                         Color{30, 10, 8, 255});
+    DrawRectangleRounded(body, 0.35f, 6, red);
+    DrawRectangleRounded({body.x, body.y + body.height * 0.55f, body.width, body.height * 0.45f}, 0.35f, 6,
+                         darken(red, 0.25f));
+    DrawRectangleRec({body.x, body.y + body.height * 0.22f, body.width, r * 0.14f}, hoop);
+    DrawRectangleRec({body.x, body.y + body.height * 0.7f, body.width, r * 0.14f}, hoop);
+    ellipse(g, {p.x, body.y + 1}, r * 0.8f, r * 0.3f, Color{30, 10, 8, 255});
+    ellipse(g, {p.x, body.y + 1}, r * 0.74f, r * 0.25f, brighten(red, 0.2f));
+    ellipse(g, {p.x + r * 0.3f, body.y + 1}, r * 0.14f, r * 0.08f, dark);
+    Vec2 sym{p.x, p.y + r * 0.1f};
+    tri(sym + Vec2{0, -r * 0.38f}, sym + Vec2{-r * 0.36f, r * 0.26f}, sym + Vec2{r * 0.36f, r * 0.26f},
+        Color{20, 16, 10, 255});
+    tri(sym + Vec2{0, -r * 0.3f}, sym + Vec2{-r * 0.28f, r * 0.21f}, sym + Vec2{r * 0.28f, r * 0.21f},
+        Color{255, 210, 50, 255});
+    DrawRectangleV({sym.x - r * 0.04f, sym.y - r * 0.15f}, {r * 0.08f, r * 0.2f}, Color{20, 16, 10, 255});
+    disc(g, sym + Vec2{0, r * 0.12f}, r * 0.045f, Color{20, 16, 10, 255});
+    DrawRectangleRounded({body.x + r * 0.15f, body.y + r * 0.2f, r * 0.18f, body.height * 0.6f}, 0.6f, 4,
+                         Color{255, 255, 255, 50});
+    if (flash > 0.0f)
+        DrawRectangleRounded(body, 0.35f, 6,
+                             Color{255, 255, 255, static_cast<unsigned char>(std::min(1.0f, flash / 0.09f) * 150)});
+}
+
+void draw_bat(const Gfx& g, Vec2 p, float r, float anim, float flash, Color body, bool elite, float time) {
+    Color outline = darken(body, 0.75f);
+    Color membrane = darken(body, 0.3f);
+    ellipse(g, p + Vec2{0, r * 2.2f}, r * 1.4f, r * 0.35f, Color{0, 0, 0, 55});
+    if (elite) glow(g, p, r * 2.6f, Color{255, 210, 60, 120});
+    float flap = std::sin(anim * 22.0f);
+    float span = r * (1.8f + 0.5f * flap);
+    float lift = r * 0.6f * flap;
+    for (int side = -1; side <= 1; side += 2) {
+        float sx = static_cast<float>(side);
+        Vec2 root = p + Vec2{sx * r * 0.4f, -r * 0.1f};
+        Vec2 tip = p + Vec2{sx * span, -r * 0.5f - lift};
+        Vec2 mid = p + Vec2{sx * span * 0.6f, r * 0.55f - lift * 0.4f};
+        Vec2 low = p + Vec2{sx * span * 0.9f, r * 0.35f - lift * 0.7f};
+        tri(root, tip, mid, outline);
+        tri(mid, tip, low, outline);
+        Vec2 inset{-sx * 1.5f, 1.5f};
+        tri(root + inset, tip + inset * 1.5f, mid + Vec2{0, -1.5f}, membrane);
+        tri(mid + Vec2{0, -1.5f}, tip + inset * 1.5f, low + Vec2{-sx * 1.5f, -1.5f}, membrane);
+        line(root, tip, std::max(1.5f, r * 0.12f), outline);
+    }
+    disc(g, p, r * 0.62f + 2.0f, outline);
+    disc(g, p, r * 0.62f, body);
+    for (int side = -1; side <= 1; side += 2) {
+        Vec2 ear = p + Vec2{static_cast<float>(side) * r * 0.32f, -r * 0.5f};
+        tri(ear + Vec2{-r * 0.14f, 0}, ear + Vec2{r * 0.14f, 0},
+            ear + Vec2{static_cast<float>(side) * r * 0.08f, -r * 0.4f}, outline);
+    }
+    BeginBlendMode(BLEND_ADDITIVE);
+    glow(g, p + Vec2{-r * 0.22f, -r * 0.05f}, r * 0.45f, Color{255, 50, 30, 200});
+    glow(g, p + Vec2{r * 0.22f, -r * 0.05f}, r * 0.45f, Color{255, 50, 30, 200});
+    EndBlendMode();
+    disc(g, p + Vec2{-r * 0.22f, -r * 0.05f}, r * 0.12f, Color{255, 220, 120, 255});
+    disc(g, p + Vec2{r * 0.22f, -r * 0.05f}, r * 0.12f, Color{255, 220, 120, 255});
+    tri(p + Vec2{-r * 0.16f, r * 0.25f}, p + Vec2{-r * 0.06f, r * 0.25f}, p + Vec2{-r * 0.11f, r * 0.5f}, WHITE);
+    tri(p + Vec2{r * 0.06f, r * 0.25f}, p + Vec2{r * 0.16f, r * 0.25f}, p + Vec2{r * 0.11f, r * 0.5f}, WHITE);
+    if (flash > 0.0f)
+        disc(g, p, r * 0.7f, Color{255, 255, 255, static_cast<unsigned char>(std::min(1.0f, flash / 0.09f) * 160)});
+    (void)time;
+}
+
 // Enemies are one silhouette (feet, arms and body share a single outline) with an angry face
 // that tells each type apart at a glance.
 void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, float flash, bool slowed, bool elite,
                   float time, float shield_ratio, float shield_flash, bool armored, Color tint, float tint_amount,
                   int biome) {
+    if (type == EnemyType::Barrel) {
+        draw_barrel(g, p, r, flash, 1.0f, time);
+        return;
+    }
+    if (type == EnemyType::Flyer) {
+        Color bat = blend(enemy_body_color(type), tint, tint_amount);
+        if (slowed) bat = mix(bat, Color{170, 220, 255, 255}, 0.45f);
+        draw_bat(g, p, r, anim, flash, bat, elite, time);
+        return;
+    }
     Color base = blend(enemy_body_color(type), tint, tint_amount);
     if (slowed) base = mix(base, Color{170, 220, 255, 255}, 0.45f);
     Color body = base;
@@ -331,6 +414,8 @@ void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, flo
         jagged_mouth(g, c + Vec2{0, r * 0.45f}, r * 0.34f, r * 0.12f, outline, inside, 5, false);
         break;
     }
+    case EnemyType::Flyer:
+    case EnemyType::Barrel:
     case EnemyType::Boss:
     case EnemyType::Count:
         break;
@@ -1030,11 +1115,16 @@ void draw_gate(Game& game, const Gate& gate) {
     }
     char op = '+';
     int magnitude = std::abs(gate.state.value);
+    bool stat = gate.state.kind == GateKind::Rate || gate.state.kind == GateKind::Power;
     if (mul)
         op = gate.state.value > 0 ? 'x' : '/';
     else if (gate.state.value < 0)
         op = '-';
-    std::string num = std::format("{}", magnitude);
+    std::string num = stat ? std::format("{}%", magnitude) : std::format("{}", magnitude);
+    if (stat) {
+        text(g, gate.state.kind == GateKind::Rate ? "FIRE RATE" : "DAMAGE", {gate.x, r.y + 11}, 15,
+             Color{255, 255, 255, 230}, Align::Center, false);
+    }
     float size = 44.0f * s;
     float tw = text_width(g, num, size);
     float gap = size * 0.72f;
@@ -1630,6 +1720,11 @@ void render_world(Game& game) {
                       e->shield_max > 0.0f ? std::max(0.0f, e->shield_hp / e->shield_max) : 0.0f);
             continue;
         }
+        if (e->type == EnemyType::Flyer) continue;
+        if (e->type == EnemyType::Barrel) {
+            draw_barrel(g, e->pos, e->radius, e->flash, e->hp / e->max_hp, game.time);
+            continue;
+        }
         draw_monster(g, e->type, e->pos, e->radius, e->anim, e->flash, e->slow_timer > 0.0f, e->elite, game.time,
                      e->shield_max > 0.0f ? std::max(0.0f, e->shield_hp / e->shield_max) : 0.0f, e->shield_flash,
                      e->armor > 0.0f, run.theme.enemy_tint, run.theme.enemy_tint_amount, run.theme.biome);
@@ -1645,6 +1740,12 @@ void render_world(Game& game) {
     }
 
     for (const auto& gate : run.gates) draw_gate(game, gate);
+    for (const Enemy* e : order) {
+        if (e->type != EnemyType::Flyer) continue;
+        Color bat = blend(enemy_body_color(EnemyType::Flyer), run.theme.enemy_tint, run.theme.enemy_tint_amount);
+        if (e->slow_timer > 0.0f) bat = mix(bat, Color{170, 220, 255, 255}, 0.45f);
+        draw_bat(g, e->pos, e->radius, e->anim, e->flash, bat, e->elite, game.time);
+    }
     for (const auto& f : run.loot) draw_loot(game, f);
 
     draw_night(run.theme);

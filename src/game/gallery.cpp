@@ -48,9 +48,10 @@ void page_enemies(Game& game) {
     for (int c = 0; c < 4; ++c) label(game, cols[c], 150.0f + static_cast<float>(c) * 160.0f, 76);
     for (int t = 0; t < static_cast<int>(EnemyType::Count); ++t) {
         auto type = static_cast<EnemyType>(t);
-        float y = 150.0f + static_cast<float>(t) * 142.0f;
+        float y = 130.0f + static_cast<float>(t) * 116.0f;
         float r = base_stats(type).radius * (type == EnemyType::Boss ? 0.6f : 1.0f);
-        const char* names[] = {"WALKER", "RUNNER", "BRUTE", "EXPLODER", "SPITTER", "SHIELDER", "SPLITTER", "BOSS x0.6"};
+        const char* names[] = {"WALKER",   "RUNNER",   "BRUTE", "EXPLODER", "SPITTER",
+                               "SHIELDER", "SPLITTER", "FLYER", "BARREL",   "BOSS x0.6"};
         text(game.gfx, names[t], {8, y}, 14, LABEL, Align::Left, false);
         for (int c = 0; c < 4; ++c) {
             Vec2 p{150.0f + static_cast<float>(c) * 160.0f, y};
@@ -126,8 +127,10 @@ void page_gates_projectiles(Game& game) {
     gate(GateKind::Add, 12, false, 120, 350, 218);
     gate(GateKind::Add, -40, true, 360, 350, 218);
     gate(GateKind::Mul, 1, false, 600, 350, 218);
+    gate(GateKind::Rate, 14, false, 180, 430, 338);
+    gate(GateKind::Power, -22, true, 540, 430, 338);
 
-    label(game, "BULLETS PER UNIT (flying up)", 360, 440);
+    label(game, "BULLETS PER UNIT (flying up)", 360, 490);
     for (int u = 0; u < UNIT_COUNT; ++u) {
         Bullet b;
         b.pos = {80.0f + static_cast<float>(u) * 110.0f, 540};

@@ -31,6 +31,10 @@ inline Color enemy_body_color(EnemyType t) {
         return {96, 140, 150, 255};
     case EnemyType::Splitter:
         return {230, 140, 60, 255};
+    case EnemyType::Flyer:
+        return {96, 70, 120, 255};
+    case EnemyType::Barrel:
+        return {200, 60, 40, 255};
     case EnemyType::Boss:
         return {150, 60, 60, 255};
     case EnemyType::Count:

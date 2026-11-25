@@ -67,3 +67,13 @@ TEST_CASE("hits needed per point scale with fire output", "[gates]") {
     CHECK(hits_per_point(24.0f) == 20);
     CHECK(hits_per_point(1e6f) == 400);
 }
+
+TEST_CASE("stat gates leave the squad size alone and move in percent", "[gates]") {
+    GateState rate{GateKind::Rate, -6, false};
+    CHECK(apply_gate(40, rate) == 40);
+    for (int i = 0; i < 100; ++i) gate_hit(rate, 1, 1.0f, 40);
+    CHECK(rate.value == STAT_MAX);
+    GateState power{GateKind::Power, -6, true};
+    for (int i = 0; i < 100; ++i) gate_hit(power, 1, 1.0f, 40);
+    CHECK(power.value == STAT_MIN);
+}

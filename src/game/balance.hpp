@@ -57,6 +57,10 @@ inline EnemyStats base_stats(EnemyType t) {
         return {34, 38, 22, 5, 0.6f, 3, 2};
     case EnemyType::Splitter:
         return {44, 42, 25, 5, 0.2f, 3, 2};
+    case EnemyType::Flyer:
+        return {6, 95, 16, 3, 0.0f, 1, 1};
+    case EnemyType::Barrel:
+        return {18, 34, 18, 0, 1.0f, 0, 2};
     case EnemyType::Boss:
         return {1900, 17, 84, 45, 1.0f, 60, 60};
     case EnemyType::Count:
@@ -110,10 +114,14 @@ struct WaveCounts {
     int spitters{};
     int shielders{};
     int splitters{};
+    int flyers{};
+    int barrels{};
     int bosses{};
     bool mini_boss{false};
 
-    int total() const { return walkers + runners + brutes + exploders + spitters + shielders + splitters + bosses; }
+    int total() const {
+        return walkers + runners + brutes + exploders + spitters + shielders + splitters + flyers + barrels + bosses;
+    }
 };
 
 inline WaveCounts wave_counts(int stage, int wave) {
@@ -127,6 +135,8 @@ inline WaveCounts wave_counts(int stage, int wave) {
     c.spitters = wave >= 6 ? sc(wave / 3) : 0;
     c.splitters = (wave >= 3 || stage > 1) ? sc(wave / 2) : 0;
     c.shielders = (wave >= 5 || stage > 1) ? sc(1 + wave / 2) : 0;
+    c.flyers = (wave >= 4 || stage > 1) ? sc(6 + 2 * wave) : 0;
+    c.barrels = wave >= 2 ? 2 + wave / 3 : 0;
     if (wave == MINI_BOSS_WAVE) {
         c.bosses = 1;
         c.mini_boss = true;
@@ -183,6 +193,11 @@ inline std::vector<SpawnEvent> build_wave(int stage, int wave, Rng& rng) {
     }
     emit(EnemyType::Splitter, counts.splitters);
     emit(EnemyType::Shielder, counts.shielders);
+    emit(EnemyType::Flyer, counts.flyers);
+    // Barrels drift in the thick of a surge, where a well-timed shot clears the most.
+    for (int i = 0; i < counts.barrels; ++i) {
+        out.push_back({duration * (0.15f + 0.7f * rng.unit()), EnemyType::Barrel, rng.uniform(lo_x + 60, hi_x - 60)});
+    }
     for (int i = 0; i < counts.spitters; ++i) {
         out.push_back({duration * (0.1f + 0.6f * rng.unit()), EnemyType::Spitter, rng.uniform(lo_x, hi_x)});
     }
@@ -216,7 +231,7 @@ inline float expected_growth(int wave) {
 // instead of being scaled away.
 inline float power_hp_mult(float player_power, float start_power, int wave) {
     float ratio = player_power / (std::max(1.0f, start_power) * expected_growth(wave));
-    return ratio > 1.0f ? std::pow(ratio, 0.65f) : 1.0f;
+    return ratio > 1.0f ? std::pow(ratio, 0.75f) : 1.0f;
 }
 inline float threat_count_mult(float threat) {
     return std::sqrt(threat);

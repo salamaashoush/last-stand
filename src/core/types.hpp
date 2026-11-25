@@ -31,11 +31,23 @@ struct Vec2 {
     static Vec2 from_raylib(Vector2 v) { return {v.x, v.y}; }
 };
 
-enum class EnemyType : uint8_t { Walker, Runner, Brute, Exploder, Spitter, Shielder, Splitter, Boss, Count };
+enum class EnemyType : uint8_t {
+    Walker,
+    Runner,
+    Brute,
+    Exploder,
+    Spitter,
+    Shielder,
+    Splitter,
+    Flyer,
+    Barrel,
+    Boss,
+    Count
+};
 
 enum class TurretType : uint8_t { None, Cannon, Tesla, Flamer, Laser, Count };
 
-enum class GateKind : uint8_t { Add, Mul };
+enum class GateKind : uint8_t { Add, Mul, Rate, Power };
 
 enum class GameStateId : uint8_t { Menu, Playing, Results, Armory, Missions };
 

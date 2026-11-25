@@ -9,6 +9,9 @@ namespace ls {
 
 inline constexpr int MAX_SOLDIERS = 999;
 inline constexpr int MUL_STEP_POINTS = 12;
+inline constexpr int STAT_STEP = 1;
+inline constexpr int STAT_MAX = 15;
+inline constexpr int STAT_MIN = -40;
 
 // Gates follow the genre's two-colour rule: a blue gate climbs with every bullet that lands,
 // a red gate gets worse with every bullet that lands. Add gates carry a signed count; mul
@@ -54,6 +57,11 @@ inline bool gate_hit(GateState& g, int hits_needed, float growth, int soldiers) 
         g.value = std::min(cap, g.value + pts * add_step(soldiers));
         return true;
     }
+    if (g.kind == GateKind::Rate || g.kind == GateKind::Power) {
+        int before = g.value;
+        g.value = g.red ? std::max(STAT_MIN, g.value - STAT_STEP * pts) : std::min(STAT_MAX, g.value + STAT_STEP * pts);
+        return g.value != before;
+    }
     if (g.points < MUL_STEP_POINTS) return false;
     g.points = 0;
     if (g.red) {
@@ -72,6 +80,7 @@ inline bool gate_hit(GateState& g, int hits_needed, float growth, int soldiers) 
 
 inline int apply_gate(int soldiers, const GateState& g) {
     long long out = soldiers;
+    if (g.kind == GateKind::Rate || g.kind == GateKind::Power) return soldiers;
     if (g.kind == GateKind::Add) {
         out = soldiers + static_cast<long long>(g.value);
     } else if (g.value > 0) {
@@ -98,7 +107,11 @@ inline std::vector<GateState> roll_gate_row(Rng& rng, int wave, int soldiers, in
     for (int i = 0; i < lanes; ++i) {
         GateState g;
         g.red = i == red_lane || (i != blue_lane && rng.chance(0.5f));
-        if (rng.chance(0.14f)) {
+        if (rng.chance(0.15f)) {
+            // Stat gates change the whole squad's guns for the rest of the run, in percent.
+            g.kind = rng.chance(0.5f) ? GateKind::Rate : GateKind::Power;
+            g.value = g.red ? -rng.range(4, 10) : -rng.range(2, 8);
+        } else if (rng.chance(0.14f)) {
             g.kind = GateKind::Mul;
             g.value = g.red ? -2 : (rng.chance(0.4f) ? 2 : 1);
         } else if (g.red) {

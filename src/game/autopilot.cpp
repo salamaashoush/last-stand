@@ -63,6 +63,9 @@ void autopilot_update(Game& game, float dt) {
             int shots = static_cast<int>(sps * time_left * 0.5f);
             for (int k = 0; k < shots && k < 4000; ++k) gate_hit(future, hpp, run.stats.gate_growth, run.soldiers);
             float score = static_cast<float>(apply_gate(run.soldiers, future));
+            if (future.kind == GateKind::Rate || future.kind == GateKind::Power) {
+                score = static_cast<float>(run.soldiers) * (1.0f + static_cast<float>(future.value) / 100.0f);
+            }
             if (score > best) {
                 best = score;
                 target = &g;

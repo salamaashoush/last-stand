@@ -40,7 +40,7 @@ TEST_CASE("enemies only answer in-run growth beyond the expected snowball", "[ba
     float start = 250.0f;
     CHECK(power_hp_mult(start * expected_growth(4) * 0.5f, start, 4) == 1.0f);
     CHECK_THAT(power_hp_mult(start * expected_growth(4) * 4.0f, start, 4),
-               Catch::Matchers::WithinRel(std::pow(4.0f, 0.65f), 1e-4f));
+               Catch::Matchers::WithinRel(std::pow(4.0f, 0.75f), 1e-4f));
 }
 
 TEST_CASE("formation stays inside the screen at any size", "[formation]") {

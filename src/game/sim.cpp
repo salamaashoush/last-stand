@@ -318,6 +318,11 @@ void kill_enemy(Ctx& c, int idx) {
         }
         burst(run, pos, 10, Color{255, 170, 80, 255}, 220.0f, 5.0f);
     }
+    if (type == EnemyType::Barrel) {
+        explode(c, pos, 135.0f, std::max(run.stats.damage * 18.0f, e.max_hp * 25.0f), true, Color{255, 140, 40, 255},
+                true);
+        float_text(run, "BOOM!", pos + Vec2{0, -30}, Color{255, 200, 80, 255}, 40.0f, 1.0f);
+    }
     if (type == EnemyType::Exploder) {
         explode(c, pos, 95.0f, run.stats.damage * 6.0f, false, Color{200, 230, 80, 255});
     }
@@ -424,6 +429,14 @@ Enemy& spawn_enemy(Run& run, const SpawnEvent& ev) {
         break;
     }
     if (ev.type == EnemyType::Shielder) e.shield_hp = e.shield_max = e.max_hp * 3.0f;
+    if (ev.type == EnemyType::Barrel) {
+        // About half a second of the squad's fire, whatever the stage: a target, not a tank.
+        e.hp = e.max_hp = std::max(10.0f, squad_power(run) * 0.5f);
+        e.radius = base_stats(EnemyType::Barrel).radius;
+        e.speed = base_stats(EnemyType::Barrel).speed;
+        run.new_enemies.push_back(e);
+        return run.new_enemies.back();
+    }
     float elite_chance =
         ev.type == EnemyType::Boss ? 0.0f : std::min(0.06f, 0.004f * static_cast<float>(d.wave + 3 * (d.stage - 1)));
     if (run.mod == WaveMod::Elite) elite_chance = std::max(0.12f, elite_chance * 5.0f);
@@ -954,7 +967,9 @@ void update_enemies(Ctx& c, float dt) {
             }
         } else if (!e.at_wall) {
             e.pos.y += speed * dt;
-            e.pos.x += std::sin(run.time * 1.7f + e.wobble_seed) * 14.0f * dt;
+            float sway = e.type == EnemyType::Flyer ? 90.0f : 14.0f;
+            float freq = e.type == EnemyType::Flyer ? 3.1f : 1.7f;
+            e.pos.x += std::sin(run.time * freq + e.wobble_seed) * sway * dt;
             if (e.type == EnemyType::Boss && e.pos.y > HUD_TOP + 20) {
                 float step = std::sin(e.anim * 3.0f);
                 if (step > 0.97f) add_shake(run, e.mini_boss ? 2.0f : 4.0f);
@@ -962,6 +977,10 @@ void update_enemies(Ctx& c, float dt) {
             if (e.pos.y >= stop_line) {
                 e.pos.y = stop_line;
                 e.at_wall = true;
+                if (e.type == EnemyType::Barrel) {
+                    kill_enemy(c, i);
+                    continue;
+                }
                 if (e.type == EnemyType::Exploder) {
                     damage_wall(c, std::min(120.0f * wall_damage_mult(run), run.stats.wall_max * 0.12f), e.pos);
                     add_shake(run, 10.0f);
@@ -1031,6 +1050,24 @@ void update_acids(Ctx& c, float dt) {
 
 void apply_gate_to_squad(Ctx& c, Gate& g) {
     auto& run = c.run;
+    if (g.state.kind == GateKind::Rate || g.state.kind == GateKind::Power) {
+        float k = 1.0f + static_cast<float>(g.state.value) / 100.0f;
+        bool rate = g.state.kind == GateKind::Rate;
+        if (rate) {
+            run.stats.fire_rate *= k;
+        } else {
+            run.stats.damage *= k;
+        }
+        run.tally.gates_taken++;
+        Vec2 at{run.squad_x, SQUAD_Y - 40};
+        bool up = g.state.value >= 0;
+        float_text(run, std::format("{}{}% {}", up ? "+" : "", g.state.value, rate ? "FIRE RATE" : "DAMAGE"), at,
+                   up ? Color{120, 255, 140, 255} : Color{255, 90, 90, 255}, 40.0f, 1.3f);
+        c.game.sound.play(up ? Sfx::GateGood : Sfx::GateBad, 0.9f);
+        if (!up) add_shake(run, 8.0f);
+        burst(run, at, 20, up ? Color{120, 255, 160, 255} : Color{255, 80, 80, 255}, 280.0f, 6.0f, PStar, 0.6f);
+        return;
+    }
     int before = run.soldiers;
     run.soldiers = apply_gate(run.soldiers, g.state);
     int delta = run.soldiers - before;
