@@ -106,6 +106,49 @@ void line(Vec2 a, Vec2 b, float w, Color c) {
     DrawLineEx(a.to_raylib(), b.to_raylib(), w, c);
 }
 
+namespace {
+float g_canvas_scale = 1.0f;
+
+void begin_base_camera() {
+    Camera2D base{};
+    base.zoom = g_canvas_scale;
+    BeginMode2D(base);
+}
+} // namespace
+
+void begin_canvas(const RenderTexture2D& target, float scale) {
+    g_canvas_scale = scale;
+    BeginTextureMode(target);
+    begin_base_camera();
+}
+
+void end_canvas() {
+    EndMode2D();
+    EndTextureMode();
+    g_canvas_scale = 1.0f;
+}
+
+void begin_camera(Camera2D cam) {
+    cam.offset.x *= g_canvas_scale;
+    cam.offset.y *= g_canvas_scale;
+    cam.zoom *= g_canvas_scale;
+    BeginMode2D(cam);
+}
+
+void end_camera() {
+    EndMode2D();
+    begin_base_camera();
+}
+
+void begin_scissor(float x, float y, float w, float h) {
+    float s = g_canvas_scale;
+    int x0 = static_cast<int>(std::floor(x * s));
+    int y0 = static_cast<int>(std::floor(y * s));
+    int x1 = static_cast<int>(std::ceil((x + w) * s));
+    int y1 = static_cast<int>(std::ceil((y + h) * s));
+    BeginScissorMode(x0, y0, x1 - x0, y1 - y0);
+}
+
 float text_width(const Gfx& g, std::string_view s, float size) {
     std::string tmp{s};
     return MeasureTextEx(g.font, tmp.c_str(), size, size * 0.02f).x;

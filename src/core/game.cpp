@@ -2,6 +2,7 @@
 #include "game/save.hpp"
 #include "managers/storage.hpp"
 #include <algorithm>
+#include <cmath>
 #include <ctime>
 
 namespace ls {
@@ -67,6 +68,20 @@ void Game::update_input() {
     input.down = down;
     input.consumed = false;
     if (input.pressed) input.press_pos = input.pos;
+}
+
+void Game::size_canvas() {
+    // Quarter steps keep a browser toolbar sliding in and out from reallocating the canvas
+    // every frame; the cap bounds fill rate and memory on tablets.
+    constexpr float MAX_SCALE = 2.0f;
+    float density = static_cast<float>(GetRenderWidth()) / static_cast<float>(std::max(1, GetScreenWidth()));
+    float want = std::ceil(viewport.width * density / VIRTUAL_W * 4.0f) / 4.0f;
+    want = std::clamp(want, 1.0f, MAX_SCALE);
+    if (canvas.id != 0 && want == canvas_scale) return;
+    if (canvas.id != 0) UnloadRenderTexture(canvas);
+    canvas = LoadRenderTexture(static_cast<int>(VIRTUAL_W * want), static_cast<int>(VIRTUAL_H * want));
+    SetTextureFilter(canvas.texture, TEXTURE_FILTER_BILINEAR);
+    canvas_scale = want;
 }
 
 long long today_index() {

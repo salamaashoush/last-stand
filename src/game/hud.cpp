@@ -513,7 +513,7 @@ void render_hud(Game& game) {
         DrawCircleSector(fb.to_raylib(), 32, -90, -90 + 360.0f * k, 40,
                          active ? Color{255, 120, 40, 255} : Color{255, 190, 50, 255});
         disc(g, fb, 25, full ? Color{230, 120, 30, 255} : Color{60, 50, 40, 255});
-        BeginScissorMode(static_cast<int>(fb.x - 25), static_cast<int>(fb.y - 25), 50, 50);
+        begin_scissor(fb.x - 25, fb.y - 25, 50, 50);
         draw_kid_portrait(g, Kid::Omar, fb + Vec2{0, 2}, 26, game.time, full || active);
         EndScissorMode();
         if (!full && !active) disc(g, fb, 25, Color{20, 20, 30, 120});
@@ -531,7 +531,7 @@ void render_hud(Game& game) {
         disc(g, ab2, 31, Color{20, 20, 30, 230});
         DrawCircleSector(ab2.to_raylib(), 30, -90, -90 + 360.0f * run.ali_charge, 40, Color{255, 140, 190, 255});
         disc(g, ab2, 25, full ? Color{230, 110, 160, 255} : Color{60, 46, 56, 255});
-        BeginScissorMode(static_cast<int>(ab2.x - 25), static_cast<int>(ab2.y - 25), 50, 50);
+        begin_scissor(ab2.x - 25, ab2.y - 25, 50, 50);
         draw_kid_portrait(g, Kid::Ali, ab2 + Vec2{0, 2}, 26, game.time, full);
         EndScissorMode();
         if (!full) disc(g, ab2, 25, Color{20, 20, 30, 120});

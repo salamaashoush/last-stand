@@ -56,6 +56,7 @@ struct Game {
     RunResult result;
     Input input;
     RenderTexture2D canvas{};
+    float canvas_scale{1.0f};
     Rectangle viewport{};
     std::vector<Toast> toasts;
     Music* music{nullptr};
@@ -73,6 +74,7 @@ struct Game {
     void apply_volumes();
     void toast(std::string text, Color color);
     void update_input();
+    void size_canvas();
 };
 
 void load_assets(Game& game);

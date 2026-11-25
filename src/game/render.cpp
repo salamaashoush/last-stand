@@ -868,9 +868,14 @@ void draw_wall_weather(const Run& run) {
 
 void draw_courtyard(const Theme& b) {
     DrawRectangle(0, static_cast<int>(WALL_BOTTOM), VIRTUAL_W, static_cast<int>(VIRTUAL_H - WALL_BOTTOM), b.court);
+    Color seam = darken(b.court, 0.15f);
     for (int y = static_cast<int>(WALL_BOTTOM) + 18; y < VIRTUAL_H; y += 36) {
-        DrawLine(0, y, VIRTUAL_W, y, darken(b.court, 0.15f));
-        for (int x = ((y / 36) % 2) * 36; x < VIRTUAL_W; x += 72) DrawLine(x, y, x, y + 36, darken(b.court, 0.15f));
+        auto fy = static_cast<float>(y);
+        line({0.0f, fy}, {static_cast<float>(VIRTUAL_W), fy}, 1.0f, seam);
+        for (int x = ((y / 36) % 2) * 36; x < VIRTUAL_W; x += 72) {
+            auto fx = static_cast<float>(x);
+            line({fx, fy}, {fx, fy + 36.0f}, 1.0f, seam);
+        }
     }
 }
 
@@ -1165,8 +1170,7 @@ void draw_gate(Game& game, const Gate& gate) {
                            with_alpha(darken(base, 0.25f), 0.85f));
     DrawRectangleRoundedLinesEx(r, rnd, 6, 3.0f, brighten(base, 0.45f));
     if (!good) {
-        BeginScissorMode(static_cast<int>(r.x), static_cast<int>(r.y), static_cast<int>(r.width),
-                         static_cast<int>(r.height));
+        begin_scissor(r.x, r.y, r.width, r.height);
         for (float x = r.x - r.height; x < r.x + r.width; x += 26.0f) {
             line({x, r.y + r.height}, {x + r.height, r.y}, 9.0f, Color{0, 0, 0, 40});
         }
@@ -1174,8 +1178,7 @@ void draw_gate(Game& game, const Gate& gate) {
     } else {
         float sweep = std::fmod(game.time * 0.8f + gate.x * 0.003f, 1.6f) - 0.3f;
         float sx = r.x + sweep * r.width;
-        BeginScissorMode(static_cast<int>(r.x), static_cast<int>(r.y), static_cast<int>(r.width),
-                         static_cast<int>(r.height));
+        begin_scissor(r.x, r.y, r.width, r.height);
         line({sx, r.y + r.height}, {sx + r.height * 0.6f, r.y}, 14.0f, Color{255, 255, 255, 50});
         EndScissorMode();
     }
@@ -1287,8 +1290,7 @@ void draw_loot(Game& game, const Loot& f) {
         DrawRectangleRounded(r, 0.22f, 6, Color{150, 214, 245, 255});
         draw_loot_content(game, f, c);
         DrawRectangleRounded(r, 0.22f, 6, Color{185, 232, 255, 120});
-        BeginScissorMode(static_cast<int>(r.x), static_cast<int>(r.y), static_cast<int>(r.width),
-                         static_cast<int>(r.height));
+        begin_scissor(r.x, r.y, r.width, r.height);
         line({r.x, r.y + r.height * 0.55f}, {r.x + r.width * 0.55f, r.y}, 7.0f, Color{255, 255, 255, 70});
         line({r.x + r.width * 0.35f, r.y + r.height}, {r.x + r.width, r.y + r.height * 0.3f}, 4.0f,
              Color{255, 255, 255, 50});
@@ -1364,8 +1366,7 @@ void draw_loot(Game& game, const Loot& f) {
     Rng crack{static_cast<uint64_t>(f.seed * 1000.0f) + 3};
     int cracks = static_cast<int>((1.0f - ratio) * 9.0f);
     Color cc = light_cracks ? Color{255, 255, 255, 210} : Color{30, 22, 18, 230};
-    BeginScissorMode(static_cast<int>(r.x), static_cast<int>(r.y), static_cast<int>(r.width),
-                     static_cast<int>(r.height));
+    begin_scissor(r.x, r.y, r.width, r.height);
     for (int k = 0; k < cracks; ++k) {
         Vec2 p = c + Vec2{crack.uniform(-crack_half, crack_half) * 0.6f, crack.uniform(-crack_half, crack_half) * 0.6f};
         for (int sgm = 0; sgm < 3; ++sgm) {
@@ -2221,7 +2222,7 @@ void render_world(Game& game) {
     cam.target = {VIRTUAL_W * 0.5f, VIRTUAL_H * 0.5f};
     cam.offset = {VIRTUAL_W * 0.5f + shake.x, VIRTUAL_H * 0.5f + shake.y};
     cam.zoom = zoom;
-    BeginMode2D(cam);
+    begin_camera(cam);
 
     draw_backdrop(game, run.theme, game.time);
 
@@ -2339,7 +2340,7 @@ void render_world(Game& game) {
         text(g, t.text, t.pos, t.size * pop, with_alpha(t.color, a));
     }
 
-    EndMode2D();
+    end_camera();
     draw_vignette();
 
     if (run.flash > 0.0f) {

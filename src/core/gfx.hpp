@@ -31,6 +31,15 @@ void glow(const Gfx& g, Vec2 p, float r, Color c);
 void ring(const Gfx& g, Vec2 p, float r, Color c);
 void line(Vec2 a, Vec2 b, float w, Color c);
 
+// The canvas is backed at a multiple of the virtual resolution so dense screens stay sharp.
+// Drawing stays in virtual units; cameras and scissor rectangles, which raylib applies in
+// framebuffer pixels, go through these so they pick up the canvas scale.
+void begin_canvas(const RenderTexture2D& target, float scale);
+void end_canvas();
+void begin_camera(Camera2D cam);
+void end_camera();
+void begin_scissor(float x, float y, float w, float h);
+
 void text(const Gfx& g, std::string_view s, Vec2 p, float size, Color c, Align align = Align::Center,
           bool outline = true);
 float text_width(const Gfx& g, std::string_view s, float size);

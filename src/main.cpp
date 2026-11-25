@@ -67,14 +67,15 @@ void frame() {
     float dt = std::min(GetFrameTime(), 1.0f / 20.0f);
     game.time += dt;
     game.update_input();
+    game.size_canvas();
     game.update_music();
     game.states.update(game, dt);
 
-    BeginTextureMode(game.canvas);
+    ls::begin_canvas(game.canvas, game.canvas_scale);
     ClearBackground(BLACK);
     game.states.render(game);
     draw_toasts(game, dt);
-    EndTextureMode();
+    ls::end_canvas();
 
     Rectangle src{0, 0, static_cast<float>(game.canvas.texture.width), -static_cast<float>(game.canvas.texture.height)};
     static RenderTexture2D blur = [] {
@@ -153,8 +154,7 @@ int main() {
 
     auto game = std::make_unique<ls::Game>();
     g_game = game.get();
-    game->canvas = LoadRenderTexture(ls::VIRTUAL_W, ls::VIRTUAL_H);
-    SetTextureFilter(game->canvas.texture, TEXTURE_FILTER_BILINEAR);
+    game->size_canvas();
     game->gfx.init();
     game->sound.init();
     ls::load_assets(*game);
@@ -180,10 +180,10 @@ int main() {
         for (int page = 0; page < ls::gallery_page_count(); ++page) {
             game->input = {};
             ls::gallery_prepare(*game, page);
-            BeginTextureMode(game->canvas);
+            ls::begin_canvas(game->canvas, game->canvas_scale);
             ClearBackground(BLACK);
             ls::render_gallery(*game, page);
-            EndTextureMode();
+            ls::end_canvas();
             Image img = LoadImageFromTexture(game->canvas.texture);
             ImageFlipVertical(&img);
             ExportImage(img, TextFormat("%s/gallery_%02d.png", dir, page));

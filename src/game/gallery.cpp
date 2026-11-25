@@ -231,7 +231,7 @@ void page_effects(Game& game) {
                 gallery_step(run, 1.0f / 120.0f);
                 t += 1.0f / 120.0f;
             }
-            BeginScissorMode(static_cast<int>(p.x - 58), static_cast<int>(y - 90), 116, 180);
+            begin_scissor(p.x - 58, y - 90, 116, 180);
             for (const auto& n : run.new_enemies) {
                 draw_monster(game.gfx, n.type, n.pos, n.radius, 0, 0, false, false, game.time);
             }
@@ -271,8 +271,8 @@ void page_themes(Game& game, int set) {
         Camera2D cam{};
         cam.zoom = 1.0f;
         cam.offset = {0, band_top - (WALL_TOP - 230.0f)};
-        BeginScissorMode(0, static_cast<int>(band_top), VIRTUAL_W, 300);
-        BeginMode2D(cam);
+        begin_scissor(0, band_top, VIRTUAL_W, 300);
+        begin_camera(cam);
         draw_backdrop(game, th, game.time);
         for (int k = 0; k < 4; ++k) {
             draw_monster(game.gfx, static_cast<EnemyType>(k), {200.0f + static_cast<float>(k) * 90.0f, WALL_TOP - 120},
@@ -290,11 +290,11 @@ void page_themes(Game& game, int set) {
         draw_night(th);
         draw_night_lights(game, run);
         draw_wall(run);
-        EndMode2D();
+        end_camera();
         EndScissorMode();
-        BeginMode2D(cam);
+        begin_camera(cam);
         draw_loot(game, l);
-        EndMode2D();
+        end_camera();
         const char* weather[] = {"CLEAR", "SNOW", "RAIN", "LEAVES", "EMBERS", "DUST", "FIREFLIES"};
         const char* locks[] = {"ICE", "CRATE", "STONE", "CAGE", "CRYSTAL"};
         const char* decor[] = {"TREES", "ROCKS", "BONES", "CRYSTALS", "RUINS"};
@@ -362,13 +362,13 @@ void page_wall_states(Game& game) {
         Camera2D cam{};
         cam.zoom = 1.0f;
         cam.offset = {0, band_top - (WALL_TOP - 50.0f)};
-        BeginScissorMode(0, static_cast<int>(band_top), VIRTUAL_W, 200);
-        BeginMode2D(cam);
+        begin_scissor(0, band_top, VIRTUAL_W, 200);
+        begin_camera(cam);
         ClearBackground(run.theme.ground);
         DrawRectangle(0, 0, VIRTUAL_W, VIRTUAL_H, run.theme.ground);
         draw_wall(run);
         if (run.collapse_t >= 0.0f) draw_wall_collapse(run, game.gfx);
-        EndMode2D();
+        end_camera();
         EndScissorMode();
     }
 }
@@ -388,7 +388,7 @@ void page_deaths(Game& game) {
             gallery_step_full(game, 1.0f / 120.0f);
             t += 1.0f / 120.0f;
         }
-        BeginScissorMode(static_cast<int>(at.x - 115), static_cast<int>(at.y - 190), 230, 370);
+        begin_scissor(at.x - 115, at.y - 190, 230, 370);
         for (const auto& b : run.boss_deaths) draw_boss_death(game, run, b);
         draw_particles(game, run, false);
         BeginBlendMode(BLEND_ADDITIVE);
@@ -412,10 +412,10 @@ void page_deaths(Game& game) {
         Camera2D cam{};
         cam.zoom = 1.0f;
         cam.offset = {0, 1000.0f - SQUAD_Y};
-        BeginMode2D(cam);
+        begin_camera(cam);
         draw_corpses(game, run);
         draw_particles(game, run, false);
-        EndMode2D();
+        end_camera();
     }
 }
 
