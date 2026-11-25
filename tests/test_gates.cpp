@@ -77,3 +77,24 @@ TEST_CASE("stat gates leave the squad size alone and move in percent", "[gates]"
     for (int i = 0; i < 100; ++i) gate_hit(power, 1, 1.0f, 40);
     CHECK(power.value == STAT_MIN);
 }
+
+TEST_CASE("gate_after_hits matches firing the bullets one at a time", "[gates]") {
+    Rng rng{11};
+    for (int i = 0; i < 2000; ++i) {
+        GateState g;
+        g.kind = static_cast<GateKind>(rng.range(0, 3));
+        g.red = rng.chance(0.5f);
+        g.value = g.kind == GateKind::Mul ? (g.red ? -2 : rng.range(1, 2)) : -rng.range(0, 20);
+        g.hit_accum = rng.range(0, 3);
+        int hpp = rng.range(4, 30);
+        int soldiers = rng.range(1, 300);
+        float growth = rng.chance(0.5f) ? 1.0f : 2.0f;
+        int hits = rng.range(0, 500);
+        GateState slow = g;
+        for (int k = 0; k < hits; ++k) gate_hit(slow, hpp, growth, soldiers);
+        GateState fast = gate_after_hits(g, hits, hpp, growth, soldiers);
+        REQUIRE(fast.value == slow.value);
+        REQUIRE(fast.hit_accum == slow.hit_accum);
+        REQUIRE(fast.points == slow.points);
+    }
+}

@@ -78,6 +78,43 @@ inline bool gate_hit(GateState& g, int hits_needed, float growth, int soldiers) 
     return false;
 }
 
+// The state after `hits` more bullets, without stepping through them one by one.
+inline GateState gate_after_hits(GateState g, int hits, int hits_needed, float growth, int soldiers) {
+    int total = g.hit_accum + std::max(0, hits);
+    int triggers = total / hits_needed;
+    g.hit_accum = total % hits_needed;
+    if (triggers == 0) return g;
+    int pts = std::max(1, static_cast<int>(std::lround(growth)));
+    switch (g.kind) {
+    case GateKind::Add: {
+        g.points += triggers * pts;
+        int delta = triggers * pts * add_step(soldiers);
+        if (g.red) {
+            g.value -= delta;
+        } else if (g.value < add_cap(soldiers)) {
+            g.value = std::min(add_cap(soldiers), g.value + delta);
+        }
+        return g;
+    }
+    case GateKind::Rate:
+    case GateKind::Power:
+        g.points += triggers * pts;
+        g.value = g.red ? std::max(STAT_MIN, g.value - STAT_STEP * pts * triggers)
+                        : std::min(STAT_MAX, g.value + STAT_STEP * pts * triggers);
+        return g;
+    case GateKind::Mul:
+        for (int t = 0; t < triggers; ++t) {
+            g.points += pts;
+            if (g.points < MUL_STEP_POINTS) continue;
+            g.points = 0;
+            if (g.red && g.value > -4) g.value -= 1;
+            if (!g.red && g.value < 3) g.value += 1;
+        }
+        return g;
+    }
+    return g;
+}
+
 inline int apply_gate(int soldiers, const GateState& g) {
     long long out = soldiers;
     if (g.kind == GateKind::Rate || g.kind == GateKind::Power) return soldiers;

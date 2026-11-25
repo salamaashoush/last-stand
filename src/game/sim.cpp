@@ -17,43 +17,110 @@ constexpr Vec2 COIN_HUD{64.0f, 52.0f};
 
 // Uniform grid rebuilt every frame; enemies are the only thing queried spatially.
 struct Grid {
-    static constexpr int CELL = 64;
+    // Cells hold ordinary enemies; anything wider than BIG_R (bosses, elite brutes) goes on a
+    // short list that every query visits. Queries then only pay for the size of the enemies
+    // actually in the cells instead of the largest monster in the game.
+    static constexpr int CELL = 72;
+    static constexpr float BIG_R = 40.0f;
     static constexpr int GW = VIRTUAL_W / CELL + 1;
     static constexpr int GH = VIRTUAL_H / CELL + 2;
     std::vector<int> head = std::vector<int>(GW * GH, -1);
     std::vector<int> next;
+    std::vector<int> big;
+    float max_small_r{0.0f};
 
     static int cell_of(float v, int max) { return std::clamp(static_cast<int>(v) / CELL, 0, max - 1); }
+    static int row_of(float y) { return cell_of(y + CELL, GH); }
 
     void build(const std::vector<Enemy>& es) {
         std::ranges::fill(head, -1);
         next.assign(es.size(), -1);
+        big.clear();
+        max_small_r = 0.0f;
         for (int i = 0; i < static_cast<int>(es.size()); ++i) {
-            if (es[static_cast<size_t>(i)].dead) continue;
-            int cx = cell_of(es[static_cast<size_t>(i)].pos.x, GW);
-            int cy = cell_of(es[static_cast<size_t>(i)].pos.y + CELL, GH);
-            int c = cy * GW + cx;
+            const auto& e = es[static_cast<size_t>(i)];
+            if (e.dead) continue;
+            if (e.radius > BIG_R) {
+                big.push_back(i);
+                continue;
+            }
+            max_small_r = std::max(max_small_r, e.radius);
+            int c = row_of(e.pos.y) * GW + cell_of(e.pos.x, GW);
             next[static_cast<size_t>(i)] = head[static_cast<size_t>(c)];
             head[static_cast<size_t>(c)] = i;
         }
     }
 
+    // Visits every enemy whose body could overlap a circle of radius r at p. Returning true
+    // from fn stops the search.
     template <typename F>
-    void query(Vec2 p, float r, F&& fn) const {
-        int x0 = cell_of(p.x - r, GW), x1 = cell_of(p.x + r, GW);
-        int y0 = cell_of(p.y - r + CELL, GH), y1 = cell_of(p.y + r + CELL, GH);
+    bool find(Vec2 p, float r, F&& fn) const {
+        float reach = r + max_small_r;
+        int x0 = cell_of(p.x - reach, GW), x1 = cell_of(p.x + reach, GW);
+        int y0 = row_of(p.y - reach), y1 = row_of(p.y + reach);
         for (int cy = y0; cy <= y1; ++cy) {
             for (int cx = x0; cx <= x1; ++cx) {
                 for (int i = head[static_cast<size_t>(cy * GW + cx)]; i != -1; i = next[static_cast<size_t>(i)]) {
-                    fn(i);
+                    if (fn(i)) return true;
                 }
             }
+        }
+        for (int i : big) {
+            if (fn(i)) return true;
+        }
+        return false;
+    }
+
+    template <typename F>
+    void query(Vec2 p, float r, F&& fn) const {
+        find(p, r, [&](int i) {
+            fn(i);
+            return false;
+        });
+    }
+
+    // Calls fn once for every pair close enough to touch. Each cell is paired with itself and
+    // four forward neighbours, so no pair is seen twice; CELL covers the widest small-small
+    // contact plus slack for movement since build().
+    template <typename F>
+    void pairs(const std::vector<Enemy>& es, F&& fn) const {
+        static constexpr int dx[4] = {1, -1, 0, 1};
+        static constexpr int dy[4] = {0, 1, 1, 1};
+        for (int cy = 0; cy < GH; ++cy) {
+            for (int cx = 0; cx < GW; ++cx) {
+                for (int i = head[static_cast<size_t>(cy * GW + cx)]; i != -1; i = next[static_cast<size_t>(i)]) {
+                    for (int j = next[static_cast<size_t>(i)]; j != -1; j = next[static_cast<size_t>(j)]) fn(i, j);
+                    for (int k = 0; k < 4; ++k) {
+                        int nx = cx + dx[k];
+                        int ny = cy + dy[k];
+                        if (nx < 0 || nx >= GW || ny >= GH) continue;
+                        for (int j = head[static_cast<size_t>(ny * GW + nx)]; j != -1;
+                             j = next[static_cast<size_t>(j)]) {
+                            fn(i, j);
+                        }
+                    }
+                }
+            }
+        }
+        for (size_t bi = 0; bi < big.size(); ++bi) {
+            int b = big[bi];
+            const auto& e = es[static_cast<size_t>(b)];
+            float reach = e.radius + max_small_r;
+            int x0 = cell_of(e.pos.x - reach, GW), x1 = cell_of(e.pos.x + reach, GW);
+            int y0 = row_of(e.pos.y - reach), y1 = row_of(e.pos.y + reach);
+            for (int cy = y0; cy <= y1; ++cy) {
+                for (int cx = x0; cx <= x1; ++cx) {
+                    for (int j = head[static_cast<size_t>(cy * GW + cx)]; j != -1; j = next[static_cast<size_t>(j)]) {
+                        fn(b, j);
+                    }
+                }
+            }
+            for (size_t bj = bi + 1; bj < big.size(); ++bj) fn(b, big[bj]);
         }
     }
 };
 
 Grid g_grid;
-constexpr float MAX_ENEMY_R = 90.0f;
 
 struct Ctx {
     Game& game;
@@ -220,7 +287,7 @@ void explode(Ctx& c, Vec2 pos, float radius, float dmg, bool status, Color tint,
     c.game.sound.play(big_sound ? Sfx::BigExplosion : Sfx::Explosion, big_sound ? 1.0f : 0.55f,
                       c.run.rng.uniform(0.9f, 1.1f));
     std::vector<int> hits;
-    g_grid.query(pos, radius + MAX_ENEMY_R, [&](int i) {
+    g_grid.query(pos, radius, [&](int i) {
         const auto& e = c.run.enemies[static_cast<size_t>(i)];
         if (!e.dead && e.pos.distance_to(pos) < radius + e.radius) hits.push_back(i);
     });
@@ -789,12 +856,14 @@ void update_bullets(Ctx& c, float dt) {
             if (!b.alive) continue;
         }
         int target = -1;
-        g_grid.query(b.pos, b.radius + MAX_ENEMY_R, [&](int i) {
-            if (target != -1 || i == b.last_hit) return;
+        g_grid.find(b.pos, b.radius, [&](int i) {
+            if (i == b.last_hit) return false;
             const auto& e = run.enemies[static_cast<size_t>(i)];
-            if (e.dead) return;
+            if (e.dead) return false;
             float rr = e.radius + b.radius;
-            if ((e.pos - b.pos).length_sq() < rr * rr) target = i;
+            if ((e.pos - b.pos).length_sq() >= rr * rr) return false;
+            target = i;
+            return true;
         });
         if (target == -1) continue;
         Vec2 hit_pos = b.pos;
@@ -1022,30 +1091,28 @@ void update_enemies(Ctx& c, float dt) {
     }
 
     // Cheap separation so a horde spreads along the wall instead of stacking into one blob.
-    for (int i = 0; i < static_cast<int>(run.enemies.size()); ++i) {
+    g_grid.pairs(run.enemies, [&](int i, int j) {
         auto& a = run.enemies[static_cast<size_t>(i)];
-        if (a.dead) continue;
-        g_grid.query(a.pos, a.radius + MAX_ENEMY_R, [&](int j) {
-            if (j <= i) return;
-            auto& b = run.enemies[static_cast<size_t>(j)];
-            if (b.dead) return;
-            Vec2 d = b.pos - a.pos;
-            float rr = (a.radius + b.radius) * 0.8f;
-            float dsq = d.length_sq();
-            if (dsq >= rr * rr || dsq < 0.0001f) return;
-            float dist = std::sqrt(dsq);
-            float push = (rr - dist) * 0.5f;
-            Vec2 n = d * (1.0f / dist);
-            float wa = b.radius / (a.radius + b.radius);
-            float wb = 1.0f - wa;
-            if (a.type == EnemyType::Boss) wa = 0.0f, wb = 1.0f;
-            if (b.type == EnemyType::Boss) wa = 1.0f, wb = 0.0f;
-            a.pos.x -= n.x * push * wa;
-            b.pos.x += n.x * push * wb;
-            if (!a.at_wall) a.pos.y -= n.y * push * wa * 0.6f;
-            if (!b.at_wall) b.pos.y += n.y * push * wb * 0.6f;
-        });
-        a.pos.x = std::clamp(a.pos.x, a.radius * 0.6f, VIRTUAL_W - a.radius * 0.6f);
+        auto& b = run.enemies[static_cast<size_t>(j)];
+        if (a.dead || b.dead) return;
+        Vec2 d = b.pos - a.pos;
+        float rr = (a.radius + b.radius) * 0.8f;
+        float dsq = d.length_sq();
+        if (dsq >= rr * rr || dsq < 0.0001f) return;
+        float dist = std::sqrt(dsq);
+        float push = (rr - dist) * 0.5f;
+        Vec2 n = d * (1.0f / dist);
+        float wa = b.radius / (a.radius + b.radius);
+        float wb = 1.0f - wa;
+        if (a.type == EnemyType::Boss) wa = 0.0f, wb = 1.0f;
+        if (b.type == EnemyType::Boss) wa = 1.0f, wb = 0.0f;
+        a.pos.x -= n.x * push * wa;
+        b.pos.x += n.x * push * wb;
+        if (!a.at_wall) a.pos.y -= n.y * push * wa * 0.6f;
+        if (!b.at_wall) b.pos.y += n.y * push * wb * 0.6f;
+    });
+    for (auto& e : run.enemies) {
+        if (!e.dead) e.pos.x = std::clamp(e.pos.x, e.radius * 0.6f, VIRTUAL_W - e.radius * 0.6f);
     }
 }
 

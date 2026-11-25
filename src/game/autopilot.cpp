@@ -59,9 +59,8 @@ void autopilot_update(Game& game, float dt) {
         float time_left = std::max(0.0f, (WALL_TOP - row_y) / GATE_SPEED);
         for (const auto& g : run.gates) {
             if (g.row != row) continue;
-            GateState future = g.state;
             int shots = static_cast<int>(sps * time_left * 0.5f);
-            for (int k = 0; k < shots && k < 4000; ++k) gate_hit(future, hpp, run.stats.gate_growth, run.soldiers);
+            GateState future = gate_after_hits(g.state, shots, hpp, run.stats.gate_growth, run.soldiers);
             float score = static_cast<float>(apply_gate(run.soldiers, future));
             if (future.kind == GateKind::Rate || future.kind == GateKind::Power) {
                 score = static_cast<float>(run.soldiers) * (1.0f + static_cast<float>(future.value) / 100.0f);

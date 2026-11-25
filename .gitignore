@@ -9,3 +9,4 @@ laststand_save.json
 *.swo
 *~
 .DS_Store
+build-rel/
