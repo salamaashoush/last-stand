@@ -44,7 +44,9 @@ inline int turret_refund(TurretType t, int level) {
 }
 
 inline float turret_damage(TurretType t, int level, int stage) {
-    return turret_def(t).damage * std::pow(1.6f, static_cast<float>(level - 1)) * stage_hp_mult(stage);
+    // Turrets keep their own stage curve so tuning enemy HP does not buff them in step.
+    return turret_def(t).damage * std::pow(1.6f, static_cast<float>(level - 1)) *
+           std::pow(1.3f, static_cast<float>(std::max(stage, 1) - 1));
 }
 
 inline float turret_interval(TurretType t, int level) {
