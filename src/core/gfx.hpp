@@ -1,6 +1,7 @@
 #pragma once
 #include "core/types.hpp"
 #include <raylib.h>
+#include <string>
 #include <string_view>
 
 namespace ls {
@@ -59,6 +60,10 @@ bool button(Game& game, Rectangle r, std::string_view label, Color color, bool e
             int key = 0, bool focused = false);
 const char* key_name(int key);
 void key_badge(const Gfx& g, Vec2 at, const char* label);
+void queue_key_badge(Vec2 at, std::string_view label);
+void queue_tooltip(Vec2 anchor, std::string title, std::string body, Color accent = Color{255, 205, 60, 255});
+void flush_key_badges(const Gfx& g);
+void flush_ui_overlays(const Gfx& g);
 bool hit(Game& game, Rectangle r);
 bool pointer_in(const Game& game, Rectangle r);
 

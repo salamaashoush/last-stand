@@ -493,10 +493,9 @@ void draw_pause(Game& game) {
                                         std::max(1, run.wave), WAVES_PER_STAGE);
     text_fit(g, sub, {VIRTUAL_W * 0.5f, 258}, 18, 540, Color{200, 215, 240, 255}, false);
 
-    // Live Battle Stats & Active Build Snapshot Card
+    // Live Battle Stats & Active Build Snapshot Card (borderless soft fill — no nested borders)
     Rectangle sr{84, 282, 552, 168};
-    DrawRectangleRounded(sr, 0.14f, 6, Color{18, 20, 34, 230});
-    DrawRectangleRoundedLinesEx(sr, 0.14f, 6, 2.0f, PANEL_EDGE);
+    DrawRectangleRounded(sr, 0.14f, 6, Color{16, 19, 32, 220});
     float wall_pct = 100.0f * std::clamp(run.wall_hp / std::max(1.0f, run.stats.wall_max), 0.0f, 1.0f);
     float crit_pct = std::min(100.0f, (run.stats.crit_chance + formation_crit_bonus(run.formation)) * 100.0f);
     struct StatCell {
@@ -578,10 +577,9 @@ void draw_pause(Game& game) {
     toggle({104, 726, 246, 56}, "MUSIC", game.meta.music_volume, game.saved_music_vol, 0.5f);
     toggle({370, 726, 246, 56}, "SFX", game.meta.sfx_volume, game.saved_sfx_vol, 0.8f);
 
-    // Quick Controls Reference Card
+    // Quick Controls Reference Card (borderless soft fill)
     Rectangle cr{84, 804, 552, 166};
-    DrawRectangleRounded(cr, 0.14f, 6, Color{18, 20, 34, 220});
-    DrawRectangleRoundedLinesEx(cr, 0.14f, 6, 1.8f, PANEL_EDGE);
+    DrawRectangleRounded(cr, 0.14f, 6, Color{16, 19, 32, 210});
     text(g, "CONTROLS & SHORTCUTS", {VIRTUAL_W * 0.5f, cr.y + 24}, 17, GOLD_TINT);
     text_fit(g, "MOVE: Drag or A / D   |   FORMATION: F   |   REPAIR WALL: R", {VIRTUAL_W * 0.5f, cr.y + 56}, 14,
              cr.width - 24, Color{205, 218, 242, 255}, false);
@@ -886,6 +884,7 @@ void render_hud(Game& game) {
         }
     }
 
+    flush_key_badges(g);
     if (run.build_slot >= 0 && !run.picking && !game.paused) draw_build_menu(game);
 
     if (run.picking) draw_cards(game);

@@ -75,6 +75,7 @@ void frame() {
     ls::begin_canvas(game.canvas, game.canvas_scale);
     ClearBackground(BLACK);
     game.states.render(game);
+    ls::flush_ui_overlays(game.gfx);
     draw_toasts(game, dt);
     ls::end_canvas();
 
@@ -189,6 +190,7 @@ int main() {
             ls::begin_canvas(game->canvas, game->canvas_scale);
             ClearBackground(BLACK);
             ls::render_gallery(*game, page);
+            ls::flush_ui_overlays(game->gfx);
             ls::end_canvas();
             Image img = LoadImageFromTexture(game->canvas.texture);
             ImageFlipVertical(&img);

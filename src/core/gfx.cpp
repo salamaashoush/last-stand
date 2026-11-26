@@ -2,7 +2,9 @@
 #include "core/game.hpp"
 #include <algorithm>
 #include <cmath>
+#include <optional>
 #include <string>
+#include <vector>
 
 namespace ls {
 
@@ -254,13 +256,94 @@ const char* key_name(int key) {
     return buf;
 }
 
+namespace {
+
+struct QueuedKeyBadge {
+    Vec2 at;
+    std::string label;
+};
+
+struct QueuedTooltip {
+    Vec2 anchor;
+    std::string title;
+    std::string body;
+    Color accent;
+};
+
+std::vector<QueuedKeyBadge> g_key_badges;
+std::optional<QueuedTooltip> g_tooltip;
+
+} // namespace
+
 void key_badge(const Gfx& g, Vec2 at, const char* label) {
-    float w = std::max(26.0f, text_width(g, label, 16) + 14.0f);
-    Rectangle r{at.x - w * 0.5f, at.y - 13, w, 26};
-    DrawRectangleRounded({r.x, r.y + 3, r.width, r.height}, 0.4f, 6, Color{0, 0, 0, 120});
-    DrawRectangleRounded(r, 0.4f, 6, Color{236, 236, 244, 255});
-    DrawRectangleRoundedLinesEx(r, 0.4f, 6, 2.0f, Color{60, 60, 80, 255});
-    text(g, label, {at.x, at.y}, 16, Color{40, 40, 60, 255}, Align::Center, false);
+    float w = std::max(22.0f, text_width(g, label, 14) + 12.0f);
+    Rectangle r{at.x - w * 0.5f, at.y - 11.0f, w, 22.0f};
+    DrawRectangleRounded({r.x, r.y + 2.5f, r.width, r.height}, 0.42f, 6, Color{0, 0, 0, 130});
+    DrawRectangleRounded(r, 0.42f, 6, Color{240, 242, 250, 255});
+    DrawRectangleRoundedLinesEx(r, 0.42f, 6, 1.8f, Color{50, 54, 74, 255});
+    text(g, label, {at.x, at.y}, 14, Color{36, 40, 60, 255}, Align::Center, false);
+}
+
+void queue_key_badge(Vec2 at, std::string_view label) {
+    g_key_badges.push_back({at, std::string(label)});
+}
+
+void queue_tooltip(Vec2 anchor, std::string title, std::string body, Color accent) {
+    g_tooltip = QueuedTooltip{anchor, std::move(title), std::move(body), accent};
+}
+
+void flush_key_badges(const Gfx& g) {
+    for (const auto& kb : g_key_badges) {
+        key_badge(g, kb.at, kb.label.c_str());
+    }
+    g_key_badges.clear();
+}
+
+void flush_ui_overlays(const Gfx& g) {
+    flush_key_badges(g);
+    if (!g_tooltip) return;
+    const auto& tt = *g_tooltip;
+    std::vector<std::string_view> lines;
+    size_t pos = 0;
+    while (pos <= tt.body.size()) {
+        size_t nl = tt.body.find('\n', pos);
+        if (nl == std::string::npos) {
+            if (pos < tt.body.size()) lines.emplace_back(tt.body.data() + pos, tt.body.size() - pos);
+            break;
+        }
+        lines.emplace_back(tt.body.data() + pos, nl - pos);
+        pos = nl + 1;
+    }
+
+    float max_w = text_width(g, tt.title, 18.0f);
+    for (auto ln : lines) max_w = std::max(max_w, text_width(g, ln, 15.0f));
+    float w = std::clamp(max_w + 32.0f, 190.0f, 460.0f);
+    float h = 38.0f + static_cast<float>(lines.size()) * 21.0f + 10.0f;
+
+    float x = std::clamp(tt.anchor.x - w * 0.5f, 16.0f, static_cast<float>(VIRTUAL_W) - w - 16.0f);
+    bool below = tt.anchor.y - h - 18.0f < 16.0f;
+    float y = below ? (tt.anchor.y + 18.0f) : (tt.anchor.y - h - 16.0f);
+    y = std::clamp(y, 16.0f, static_cast<float>(VIRTUAL_H) - h - 16.0f);
+
+    Rectangle box{x, y, w, h};
+    DrawRectangleRounded({box.x, box.y + 5.0f, box.width, box.height}, 0.22f, 8, Color{0, 0, 0, 140});
+    DrawRectangleRounded(box, 0.22f, 8, Color{16, 19, 32, 248});
+    DrawRectangleRoundedLinesEx(box, 0.22f, 8, 2.0f, tt.accent);
+
+    float ax = std::clamp(tt.anchor.x, box.x + 20.0f, box.x + box.width - 20.0f);
+    if (below) {
+        DrawTriangle({ax, box.y - 9.0f}, {ax - 8.0f, box.y + 1.0f}, {ax + 8.0f, box.y + 1.0f}, Color{16, 19, 32, 248});
+    } else {
+        DrawTriangle({ax - 8.0f, box.y + box.height - 1.0f}, {ax, box.y + box.height + 9.0f},
+                     {ax + 8.0f, box.y + box.height - 1.0f}, Color{16, 19, 32, 248});
+    }
+
+    text_fit(g, tt.title, {box.x + box.width * 0.5f, box.y + 21.0f}, 18.0f, box.width - 24.0f, tt.accent, false);
+    for (size_t i = 0; i < lines.size(); ++i) {
+        text_fit(g, lines[i], {box.x + box.width * 0.5f, box.y + 46.0f + static_cast<float>(i) * 21.0f}, 15.0f,
+                 box.width - 24.0f, Color{220, 228, 245, 255}, false);
+    }
+    g_tooltip.reset();
 }
 
 bool button(Game& game, Rectangle r, std::string_view label, Color color, bool enabled, float font_size, int key,
@@ -274,15 +357,23 @@ bool button(Game& game, Rectangle r, std::string_view label, Color color, bool e
     DrawRectangleRounded(body, 0.35f, 8, fill);
     DrawRectangleRounded({body.x + 6, body.y + 4, body.width - 12, body.height * 0.42f}, 0.35f, 8,
                          Color{255, 255, 255, 50});
-    DrawRectangleRoundedLinesEx(body, 0.35f, 8, 3.0f, darken(fill, 0.35f));
-    text(game.gfx, label, {body.x + body.width * 0.5f, body.y + body.height * 0.5f}, font_size,
-         enabled ? WHITE : Color{200, 200, 200, 255});
     if (focused) {
         float pulse = 0.5f + 0.5f * std::sin(game.time * 8.0f);
-        DrawRectangleRoundedLinesEx({body.x - 5, body.y - 5, body.width + 10, body.height + 10}, 0.35f, 8, 4.0f,
-                                    Color{255, 230, 120, static_cast<unsigned char>(160 + 95 * pulse)});
+        DrawRectangleRoundedLinesEx(body, 0.35f, 8, 3.5f,
+                                    Color{255, 234, 138, static_cast<unsigned char>(185 + 70 * pulse)});
+    } else {
+        DrawRectangleRoundedLinesEx(body, 0.35f, 8, 3.0f, darken(fill, 0.35f));
     }
-    if (key != 0 && !game.touch_ui) key_badge(game.gfx, {body.x + body.width - 8, body.y + 2}, key_name(key));
+    if (!label.empty()) {
+        text(game.gfx, label, {body.x + body.width * 0.5f, body.y + body.height * 0.5f}, font_size,
+             enabled ? WHITE : Color{200, 200, 200, 255});
+    }
+    if (key != 0 && !game.touch_ui) {
+        const char* kn = key_name(key);
+        float bw = std::max(22.0f, text_width(game.gfx, kn, 14) + 12.0f);
+        float bx = std::max(body.x + body.width * 0.5f, body.x + body.width - bw * 0.5f + 3.0f);
+        queue_key_badge({bx, body.y - 2.0f}, kn);
+    }
     if (!enabled) return false;
     if (key != 0 && IsKeyPressed(key)) {
         game.sound.play(Sfx::Click, 0.7f);
