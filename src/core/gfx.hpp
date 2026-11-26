@@ -10,9 +10,13 @@ struct Game;
 enum class Align : uint8_t { Left, Center, Right };
 
 struct Gfx {
-    Texture2D disc{};
-    Texture2D glow{};
-    Texture2D ring{};
+    // Single procedural atlas holding disc, glow, ring, and a solid white swatch bound to
+    // SetShapesTexture() so shapes + radial primitives share one texture with zero WebGL flushes.
+    Texture2D atlas{};
+    Rectangle disc_rect{};
+    Rectangle glow_rect{};
+    Rectangle ring_rect{};
+    Rectangle white_rect{};
     Font font{};
     bool font_loaded{false};
 

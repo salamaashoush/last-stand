@@ -8,9 +8,7 @@ namespace ls {
 
 namespace {
 
-Texture2D make_radial(int size, float (*profile)(float)) {
-    Image img = GenImageColor(size, size, BLANK);
-    auto* px = static_cast<Color*>(img.data);
+void paint_radial(Color* px, int atlas_w, int ox, int oy, int size, float (*profile)(float)) {
     float c = (static_cast<float>(size) - 1.0f) * 0.5f;
     for (int y = 0; y < size; ++y) {
         for (int x = 0; x < size; ++x) {
@@ -18,14 +16,9 @@ Texture2D make_radial(int size, float (*profile)(float)) {
             float dy = (static_cast<float>(y) - c) / c;
             float d = std::sqrt(dx * dx + dy * dy);
             float a = std::clamp(profile(d), 0.0f, 1.0f);
-            px[y * size + x] = Color{255, 255, 255, static_cast<unsigned char>(a * 255.0f)};
+            px[(oy + y) * atlas_w + (ox + x)] = Color{255, 255, 255, static_cast<unsigned char>(a * 255.0f)};
         }
     }
-    Texture2D t = LoadTextureFromImage(img);
-    UnloadImage(img);
-    GenTextureMipmaps(&t);
-    SetTextureFilter(t, TEXTURE_FILTER_TRILINEAR);
-    return t;
 }
 
 float profile_disc(float d) {
@@ -39,18 +32,52 @@ float profile_ring(float d) {
     return (1.0f - std::abs(d - 0.92f) / 0.06f) * 1.6f;
 }
 
-void quad(const Texture2D& t, Vec2 p, float rx, float ry, Color c) {
-    Rectangle src{0, 0, static_cast<float>(t.width), static_cast<float>(t.height)};
+void quad(const Texture2D& t, Rectangle src, Vec2 p, float rx, float ry, Color c) {
     Rectangle dst{p.x - rx, p.y - ry, rx * 2.0f, ry * 2.0f};
     DrawTexturePro(t, src, dst, {0, 0}, 0.0f, c);
 }
 
+// Stack-allocated null-terminated copy for zero-allocation text measurement & drawing.
+struct CStrBuf {
+    char stack[256];
+    std::string heap;
+    const char* ptr;
+
+    explicit CStrBuf(std::string_view s) {
+        if (s.size() < sizeof(stack)) {
+            std::copy(s.begin(), s.end(), stack);
+            stack[s.size()] = '\0';
+            ptr = stack;
+        } else {
+            heap.assign(s);
+            ptr = heap.c_str();
+        }
+    }
+};
+
 } // namespace
 
 void Gfx::init() {
-    disc = make_radial(128, profile_disc);
-    glow = make_radial(128, profile_glow);
-    ring = make_radial(128, profile_ring);
+    constexpr int AW = 256;
+    constexpr int CELL = 124;
+    Image img = GenImageColor(AW, AW, BLANK);
+    auto* px = static_cast<Color*>(img.data);
+    paint_radial(px, AW, 2, 2, CELL, profile_disc);
+    paint_radial(px, AW, 130, 2, CELL, profile_glow);
+    paint_radial(px, AW, 2, 130, CELL, profile_ring);
+    // Solid white quadrant (with wide margin) for raylib shape batching.
+    for (int y = 132; y < 252; ++y) {
+        for (int x = 132; x < 252; ++x) px[y * AW + x] = WHITE;
+    }
+    atlas = LoadTextureFromImage(img);
+    UnloadImage(img);
+    SetTextureFilter(atlas, TEXTURE_FILTER_BILINEAR);
+    disc_rect = {2, 2, CELL, CELL};
+    glow_rect = {130, 2, CELL, CELL};
+    ring_rect = {2, 130, CELL, CELL};
+    white_rect = {148, 148, 88, 88};
+    SetShapesTexture(atlas, white_rect);
+
     const char* font_path = "assets/fonts/LilitaOne-Regular.ttf";
     if (FileExists(font_path)) {
         font = LoadFontEx(font_path, 72, nullptr, 0);
@@ -63,9 +90,8 @@ void Gfx::init() {
 }
 
 void Gfx::unload() {
-    UnloadTexture(disc);
-    UnloadTexture(glow);
-    UnloadTexture(ring);
+    SetShapesTexture(Texture2D{}, Rectangle{});
+    UnloadTexture(atlas);
     if (font_loaded) UnloadFont(font);
 }
 
@@ -90,16 +116,16 @@ Color darken(Color c, float amount) {
 }
 
 void disc(const Gfx& g, Vec2 p, float r, Color c) {
-    quad(g.disc, p, r, r, c);
+    quad(g.atlas, g.disc_rect, p, r, r, c);
 }
 void ellipse(const Gfx& g, Vec2 p, float rx, float ry, Color c) {
-    quad(g.disc, p, rx, ry, c);
+    quad(g.atlas, g.disc_rect, p, rx, ry, c);
 }
 void glow(const Gfx& g, Vec2 p, float r, Color c) {
-    quad(g.glow, p, r, r, c);
+    quad(g.atlas, g.glow_rect, p, r, r, c);
 }
 void ring(const Gfx& g, Vec2 p, float r, Color c) {
-    quad(g.ring, p, r, r, c);
+    quad(g.atlas, g.ring_rect, p, r, r, c);
 }
 
 void line(Vec2 a, Vec2 b, float w, Color c) {
@@ -150,14 +176,14 @@ void begin_scissor(float x, float y, float w, float h) {
 }
 
 float text_width(const Gfx& g, std::string_view s, float size) {
-    std::string tmp{s};
-    return MeasureTextEx(g.font, tmp.c_str(), size, size * 0.02f).x;
+    CStrBuf tmp{s};
+    return MeasureTextEx(g.font, tmp.ptr, size, size * 0.02f).x;
 }
 
 void text(const Gfx& g, std::string_view s, Vec2 p, float size, Color c, Align align, bool outline) {
-    std::string tmp{s};
+    CStrBuf tmp{s};
     float spacing = size * 0.02f;
-    Vector2 m = MeasureTextEx(g.font, tmp.c_str(), size, spacing);
+    Vector2 m = MeasureTextEx(g.font, tmp.ptr, size, spacing);
     float x = p.x;
     if (align == Align::Center) x -= m.x * 0.5f;
     if (align == Align::Right) x -= m.x;
@@ -165,12 +191,12 @@ void text(const Gfx& g, std::string_view s, Vec2 p, float size, Color c, Align a
     if (outline) {
         float o = std::max(2.0f, size * 0.07f);
         Color oc = Color{20, 16, 30, c.a};
-        DrawTextEx(g.font, tmp.c_str(), {x, y + o * 1.3f}, size, spacing, oc);
-        DrawTextEx(g.font, tmp.c_str(), {x - o, y}, size, spacing, oc);
-        DrawTextEx(g.font, tmp.c_str(), {x + o, y}, size, spacing, oc);
-        DrawTextEx(g.font, tmp.c_str(), {x, y - o}, size, spacing, oc);
+        DrawTextEx(g.font, tmp.ptr, {x, y + o * 1.3f}, size, spacing, oc);
+        DrawTextEx(g.font, tmp.ptr, {x - o, y}, size, spacing, oc);
+        DrawTextEx(g.font, tmp.ptr, {x + o, y}, size, spacing, oc);
+        DrawTextEx(g.font, tmp.ptr, {x, y - o}, size, spacing, oc);
     }
-    DrawTextEx(g.font, tmp.c_str(), {x, y}, size, spacing, c);
+    DrawTextEx(g.font, tmp.ptr, {x, y}, size, spacing, c);
 }
 
 void text_fit(const Gfx& g, std::string_view s, Vec2 p, float size, float max_width, Color c, bool outline) {

@@ -10,7 +10,7 @@ namespace ls {
 
 inline constexpr int WAVES_PER_STAGE = 10;
 
-enum class WaveMod : uint8_t { None, Fast, Armored, Swarm, Elite, Giants, Count };
+enum class WaveMod : uint8_t { None, Fast, Armored, Swarm, Elite, Giants, Regenerating, Count };
 
 struct WaveModDef {
     const char* name;
@@ -24,6 +24,7 @@ inline constexpr WaveModDef WAVE_MOD_DEFS[] = {
     {"SWARM", "TWICE AS MANY, HALF AS TOUGH"},
     {"ELITE GUARD", "ELITES EVERYWHERE"},
     {"GIANTS", "FEWER, BIGGER, MEANER"},
+    {"REGENERATION", "FOES MEND WOUNDS OVER TIME"},
 };
 
 inline const WaveModDef& wave_mod_def(WaveMod m) {
@@ -63,6 +64,14 @@ inline EnemyStats base_stats(EnemyType t) {
         return {18, 34, 18, 0, 1.0f, 0, 2};
     case EnemyType::Boss:
         return {1900, 17, 84, 45, 1.0f, 60, 60};
+    case EnemyType::Healer:
+        return {46, 36, 23, 3, 0.35f, 5, 4};
+    case EnemyType::Burrower:
+        return {38, 62, 21, 7, 0.4f, 4, 3};
+    case EnemyType::Berserker:
+        return {74, 54, 27, 11, 0.55f, 5, 4};
+    case EnemyType::Warlord:
+        return {110, 34, 30, 10, 0.7f, 7, 6};
     case EnemyType::Count:
         break;
     }
@@ -116,27 +125,104 @@ struct WaveCounts {
     int splitters{};
     int flyers{};
     int barrels{};
+    int healers{};
+    int burrowers{};
+    int berserkers{};
+    int warlords{};
     int bosses{};
     bool mini_boss{false};
 
     int total() const {
-        return walkers + runners + brutes + exploders + spitters + shielders + splitters + flyers + barrels + bosses;
+        return walkers + runners + brutes + exploders + spitters + shielders + splitters + flyers + barrels + healers +
+               burrowers + berserkers + warlords + bosses;
     }
 };
 
+// Handcrafted 10-stage enemy composition: paced enemy introductions across Stages 1-6,
+// then distinct tactical battle archetypes across Stages 7-10 (plus full Endless scaling!).
 inline WaveCounts wave_counts(int stage, int wave) {
-    float scale = 1.0f + 0.25f * static_cast<float>(std::max(stage, 1) - 1);
-    auto sc = [&](int n) { return static_cast<int>(std::round(static_cast<float>(n) * scale)); };
+    float scale = 1.0f + 0.22f * static_cast<float>(std::max(stage, 1) - 1);
+    auto sc = [&](float n) { return std::max(0, static_cast<int>(std::round(n * scale))); };
     WaveCounts c;
-    c.walkers = sc(26 + 12 * wave);
-    c.runners = wave >= 2 ? sc(6 + 4 * wave) : 0;
-    c.brutes = wave >= 3 ? sc((wave - 1) / 2) : 0;
-    c.exploders = wave >= 4 ? sc(2 + wave / 2) : 0;
-    c.spitters = wave >= 6 ? sc(wave / 3) : 0;
-    c.splitters = (wave >= 3 || stage > 1) ? sc(wave / 2) : 0;
-    c.shielders = (wave >= 5 || stage > 1) ? sc(1 + wave / 2) : 0;
-    c.flyers = (wave >= 4 || stage > 1) ? sc(6 + 2 * wave) : 0;
+    c.walkers = sc(22.0f + 10.0f * static_cast<float>(wave));
+    c.runners = wave >= 2 ? sc(6.0f + 3.5f * static_cast<float>(wave)) : 0;
+    c.brutes = wave >= 3 ? sc(static_cast<float>((wave - 1) / 2)) : 0;
     c.barrels = wave >= 2 ? 2 + wave / 3 : 0;
+
+    // Paced roster introductions: every stage 1..6 unveils brand-new enemy threats!
+    if (stage == 1) {
+        // Stage 1 (Sunlit Outpost): Classic frontier — Walkers, Runners, Brutes + Barrels (plus Splitters late)
+        c.splitters = wave >= 7 ? sc(static_cast<float>(wave / 3)) : 0;
+    } else if (stage == 2) {
+        // Stage 2 (Golden Dunes): Sky & Sand Ambush — introduces Flyers & Burrowers!
+        c.flyers = wave >= 2 ? sc(8.0f + 2.5f * static_cast<float>(wave)) : 0;
+        c.burrowers = wave >= 3 ? sc(2.0f + static_cast<float>(wave) * 0.45f) : 0;
+    } else if (stage == 3) {
+        // Stage 3 (Crystal Glacier): Frost Phalanx — introduces Shielders & Splitters!
+        c.shielders = wave >= 2 ? sc(2.0f + static_cast<float>(wave) * 0.65f) : 0;
+        c.splitters = wave >= 3 ? sc(2.0f + static_cast<float>(wave) * 0.55f) : 0;
+        c.flyers = wave >= 5 ? sc(4.0f + static_cast<float>(wave)) : 0;
+    } else if (stage == 4) {
+        // Stage 4 (Obsidian Caldera): Volcanic Stampede — introduces Exploders & Berserkers!
+        c.exploders = wave >= 2 ? sc(3.0f + static_cast<float>(wave) * 0.6f) : 0;
+        c.berserkers = wave >= 3 ? sc(2.0f + static_cast<float>(wave) * 0.45f) : 0;
+        c.shielders = wave >= 4 ? sc(1.0f + static_cast<float>(wave) * 0.35f) : 0;
+        c.burrowers = wave >= 6 ? sc(1.0f + static_cast<float>(wave) * 0.3f) : 0;
+    } else if (stage == 5) {
+        // Stage 5 (Venom Hollow): Plague Coven — introduces Spitters & Healers!
+        c.spitters = wave >= 2 ? sc(1.5f + static_cast<float>(wave) * 0.45f) : 0;
+        c.healers = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.35f) : 0;
+        c.splitters = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.4f) : 0;
+        c.exploders = wave >= 5 ? sc(2.0f + static_cast<float>(wave) * 0.35f) : 0;
+        c.flyers = wave >= 4 ? sc(4.0f + static_cast<float>(wave)) : 0;
+    } else if (stage == 6) {
+        // Stage 6 (Twilight Citadel): Arcane Legion — introduces Warlords!
+        c.warlords = wave >= 3 ? sc(1.0f + static_cast<float>(wave - 2) * 0.38f) : 0;
+        c.shielders = wave >= 2 ? sc(2.0f + static_cast<float>(wave) * 0.45f) : 0;
+        c.healers = wave >= 4 ? sc(1.0f + static_cast<float>(wave) * 0.3f) : 0;
+        c.spitters = wave >= 4 ? sc(1.0f + static_cast<float>(wave) * 0.35f) : 0;
+        c.flyers = wave >= 3 ? sc(5.0f + static_cast<float>(wave) * 1.4f) : 0;
+        c.berserkers = wave >= 5 ? sc(1.5f + static_cast<float>(wave) * 0.3f) : 0;
+    } else if (stage == 7) {
+        // Stage 7 (Blood-Moon Woods): Night Blitz — hyper-fast Runners, Flyers, Burrowers & Berserkers!
+        c.walkers = sc(14.0f + 6.0f * static_cast<float>(wave));
+        c.runners = sc(12.0f + 5.5f * static_cast<float>(wave));
+        c.flyers = sc(9.0f + 2.8f * static_cast<float>(wave));
+        c.burrowers = wave >= 2 ? sc(2.5f + static_cast<float>(wave) * 0.5f) : 0;
+        c.berserkers = wave >= 3 ? sc(2.5f + static_cast<float>(wave) * 0.45f) : 0;
+        c.exploders = wave >= 4 ? sc(2.0f + static_cast<float>(wave) * 0.35f) : 0;
+        c.warlords = wave >= 6 ? sc(1.0f + static_cast<float>(wave - 4) * 0.25f) : 0;
+    } else if (stage == 8) {
+        // Stage 8 (Pharaoh's Crypt): Cursed Phalanx — heavy Brutes, Shielders, Warlords, Healers & Spitters!
+        c.walkers = sc(16.0f + 7.0f * static_cast<float>(wave));
+        c.brutes = wave >= 2 ? sc(1.5f + static_cast<float>(wave) * 0.65f) : 0;
+        c.shielders = sc(3.0f + static_cast<float>(wave) * 0.7f);
+        c.warlords = wave >= 2 ? sc(1.5f + static_cast<float>(wave) * 0.38f) : 0;
+        c.healers = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.35f) : 0;
+        c.spitters = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.4f) : 0;
+        c.burrowers = wave >= 5 ? sc(1.5f + static_cast<float>(wave) * 0.3f) : 0;
+    } else if (stage == 9) {
+        // Stage 9 (Inferno Abyss): Hellfire Cataclysm — Exploders, Berserkers, Splitters, Spitters & Healers!
+        c.exploders = sc(3.5f + static_cast<float>(wave) * 0.65f);
+        c.berserkers = wave >= 2 ? sc(2.5f + static_cast<float>(wave) * 0.5f) : 0;
+        c.splitters = wave >= 2 ? sc(2.0f + static_cast<float>(wave) * 0.45f) : 0;
+        c.spitters = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.4f) : 0;
+        c.healers = wave >= 4 ? sc(1.5f + static_cast<float>(wave) * 0.35f) : 0;
+        c.warlords = wave >= 4 ? sc(1.0f + static_cast<float>(wave - 2) * 0.35f) : 0;
+        c.barrels = 4 + wave / 2;
+    } else {
+        // Stage 10 (Eclipse Throne) & Endless: Full combined-arms Sovereign's Legion!
+        c.exploders = wave >= 2 ? sc(2.5f + static_cast<float>(wave) * 0.5f) : 0;
+        c.spitters = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.4f) : 0;
+        c.splitters = wave >= 2 ? sc(1.5f + static_cast<float>(wave) * 0.45f) : 0;
+        c.shielders = wave >= 2 ? sc(2.0f + static_cast<float>(wave) * 0.55f) : 0;
+        c.flyers = wave >= 2 ? sc(6.0f + static_cast<float>(wave) * 2.0f) : 0;
+        c.healers = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.35f) : 0;
+        c.burrowers = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.35f) : 0;
+        c.berserkers = wave >= 3 ? sc(1.5f + static_cast<float>(wave) * 0.4f) : 0;
+        c.warlords = wave >= 3 ? sc(1.5f + static_cast<float>(wave - 1) * 0.38f) : 0;
+    }
+
     if (wave == MINI_BOSS_WAVE) {
         c.bosses = 1;
         c.mini_boss = true;
@@ -162,6 +248,7 @@ inline std::vector<SpawnEvent> build_wave(int stage, int wave, Rng& rng) {
     // Most of a wave arrives as surges: tight clumps that read as a horde on screen.
     // The rest trickles in so the field is never empty between surges.
     auto emit = [&](EnemyType type, int count) {
+        if (count <= 0) return;
         int surged = count * 2 / 3;
         int trickle = count - surged;
         int surges = std::max(1, std::min(4, surged / 8));
@@ -194,6 +281,19 @@ inline std::vector<SpawnEvent> build_wave(int stage, int wave, Rng& rng) {
     emit(EnemyType::Splitter, counts.splitters);
     emit(EnemyType::Shielder, counts.shielders);
     emit(EnemyType::Flyer, counts.flyers);
+    for (int i = 0; i < counts.healers; ++i) {
+        out.push_back({duration * (0.18f + 0.65f * rng.unit()), EnemyType::Healer, rng.uniform(lo_x + 50, hi_x - 50)});
+    }
+    for (int i = 0; i < counts.burrowers; ++i) {
+        out.push_back({duration * (0.12f + 0.75f * rng.unit()), EnemyType::Burrower, rng.uniform(lo_x + 30, hi_x - 30)});
+    }
+    for (int i = 0; i < counts.berserkers; ++i) {
+        out.push_back(
+            {duration * (0.16f + 0.72f * rng.unit()), EnemyType::Berserker, rng.uniform(lo_x + 30, hi_x - 30)});
+    }
+    for (int i = 0; i < counts.warlords; ++i) {
+        out.push_back({duration * (0.22f + 0.6f * rng.unit()), EnemyType::Warlord, rng.uniform(lo_x + 60, hi_x - 60)});
+    }
     // Barrels drift in the thick of a surge, where a well-timed shot clears the most.
     for (int i = 0; i < counts.barrels; ++i) {
         out.push_back({duration * (0.15f + 0.7f * rng.unit()), EnemyType::Barrel, rng.uniform(lo_x + 60, hi_x - 60)});
@@ -211,7 +311,7 @@ inline std::vector<SpawnEvent> build_wave(int stage, int wave, Rng& rng) {
 
 inline WaveMod roll_wave_mod(int stage, int wave, Rng& rng) {
     if (wave < 3 || wave == MINI_BOSS_WAVE || wave == WAVES_PER_STAGE) return WaveMod::None;
-    float chance = std::min(0.75f, 0.2f + 0.05f * static_cast<float>(wave) + 0.1f * static_cast<float>(stage - 1));
+    float chance = std::min(0.78f, 0.22f + 0.05f * static_cast<float>(wave) + 0.1f * static_cast<float>(stage - 1));
     if (!rng.chance(chance)) return WaveMod::None;
     return static_cast<WaveMod>(rng.range(1, static_cast<int>(WaveMod::Count) - 1));
 }

@@ -1,6 +1,7 @@
 #include "game/kids.hpp"
 #include <algorithm>
 #include <cmath>
+#include <rlgl.h>
 #include <utility>
 
 namespace ls {
@@ -17,6 +18,7 @@ struct KidLook {
     Color shoes;
     float curls;
     float head;
+    bool beard;
 };
 
 KidLook look(Kid k) {
@@ -29,7 +31,20 @@ KidLook look(Kid k) {
                 {30, 30, 36, 255},
                 {214, 52, 64, 255},
                 1.0f,
-                1.0f};
+                1.0f,
+                false};
+    }
+    if (k == Kid::Salama) {
+        return {{218, 164, 124, 255},
+                {186, 132, 96, 255},
+                {36, 26, 24, 255},
+                {48, 76, 138, 255},
+                {32, 52, 102, 255},
+                {44, 48, 62, 255},
+                {226, 164, 46, 255},
+                0.35f,
+                1.14f,
+                true};
     }
     return {{230, 180, 142, 255},
             {204, 150, 112, 255},
@@ -39,7 +54,8 @@ KidLook look(Kid k) {
             {38, 48, 92, 255},
             {50, 54, 70, 255},
             0.5f,
-            1.2f};
+            1.2f,
+            false};
 }
 
 void tri(Vec2 a, Vec2 b, Vec2 c, Color col) {
@@ -58,6 +74,20 @@ void draw_hair(const Gfx& g, const KidLook& L, Vec2 h, float r, bool back) {
     Color dark = L.hair;
     Color light = brighten(L.hair, 0.22f);
     float vol = L.curls;
+    if (L.beard) {
+        // Neat styled Dad hair with a fun front swoop!
+        if (back) {
+            ellipse(g, h + Vec2{0, -r * 0.22f}, r * 1.04f, r * 0.82f, darken(dark, 0.15f));
+            return;
+        }
+        ellipse(g, h + Vec2{0, -r * 0.72f}, r * 0.94f, r * 0.34f, dark);
+        ellipse(g, h + Vec2{-r * 0.22f, -r * 0.86f}, r * 0.56f, r * 0.24f, dark);
+        ellipse(g, h + Vec2{r * 0.26f, -r * 0.8f}, r * 0.44f, r * 0.2f, light);
+        // Sideburns connecting cleanly toward the beard.
+        DrawRectangleRounded({h.x - r * 0.96f, h.y - r * 0.38f, r * 0.18f, r * 0.45f}, 0.5f, 4, dark);
+        DrawRectangleRounded({h.x + r * 0.78f, h.y - r * 0.38f, r * 0.18f, r * 0.45f}, 0.5f, 4, dark);
+        return;
+    }
     if (back) {
         // A solid cap the curls sit on, so the hair reads as a mass rather than beads.
         ellipse(g, h + Vec2{0, -r * 0.28f}, r * (1.02f + 0.1f * vol), r * (0.78f + 0.12f * vol), darken(dark, 0.15f));
@@ -120,7 +150,24 @@ void draw_face(const Gfx& g, Kid k, const KidLook& L, Vec2 h, float r, KidPose p
     ellipse(g, h + Vec2{0, r * 0.3f}, r * 0.08f, r * 0.06f, L.skin_shade);
 
     Vec2 m = h + Vec2{0, r * 0.55f};
-    if (k == Kid::Omar) {
+    if (k == Kid::Salama) {
+        // Warm trimmed Dad beard & cheeky mustache!
+        Color bd = Color{42, 30, 26, 255};
+        DrawCircleSector((h + Vec2{0, r * 0.12f}).to_raylib(), r * 0.96f, 18, 162, 20, with_alpha(bd, 0.92f));
+        ellipse(g, m + Vec2{0, r * 0.04f}, r * 0.46f, r * 0.32f, L.skin);
+        // Mustache arcs
+        ellipse(g, m + Vec2{-r * 0.19f, -r * 0.12f}, r * 0.22f, r * 0.09f, bd);
+        ellipse(g, m + Vec2{r * 0.19f, -r * 0.12f}, r * 0.22f, r * 0.09f, bd);
+        if (pose == KidPose::BabaThrow || pose == KidPose::Cheer) {
+            // Big hilarious Dad belly-laugh mouth!
+            ellipse(g, m + Vec2{0, r * 0.06f}, r * 0.32f, r * 0.24f, Color{120, 28, 38, 255});
+            DrawRectangleRounded({m.x - r * 0.26f, m.y - r * 0.08f, r * 0.52f, r * 0.1f}, 0.4f, 4, WHITE);
+            ellipse(g, m + Vec2{0, r * 0.18f}, r * 0.15f, r * 0.08f, Color{236, 115, 130, 255});
+        } else {
+            DrawCircleSector((m + Vec2{0, r * 0.01f}).to_raylib(), r * 0.28f, 0, 180, 16, Color{120, 30, 40, 255});
+            DrawRectangleRec({m.x - r * 0.24f, m.y + r * 0.01f, r * 0.48f, r * 0.08f}, WHITE);
+        }
+    } else if (k == Kid::Omar) {
         bool shout = pose == KidPose::Rally;
         if (shout) {
             ellipse(g, m, r * 0.26f, r * 0.2f, Color{120, 30, 40, 255});
@@ -184,6 +231,10 @@ void draw_kid(const Gfx& g, Kid k, Vec2 feet, float scale, KidPose pose, float t
         line({base.x - S(4), body.y + S(2)}, {base.x - S(5), body.y + S(11)}, S(1.5f), WHITE);
         line({base.x + S(4), body.y + S(2)}, {base.x + S(5), body.y + S(11)}, S(1.5f), WHITE);
         DrawRectangleRounded({base.x - S(9), body.y + S(15), S(18), S(7)}, 0.5f, 4, L.top_shade);
+    } else if (k == Kid::Salama) {
+        // Dad's royal blue jersey with gold collar & #1 Dad star crest!
+        DrawRectangleRounded({base.x - S(8), body.y, S(16), S(5)}, 0.4f, 4, Color{255, 205, 60, 255});
+        DrawPoly({base.x, body.y + S(13)}, 5, S(5.5f), -18.0f, Color{255, 205, 60, 255});
     } else {
         // Little sharks on his tee.
         for (int i = 0; i < 3; ++i) {
@@ -212,6 +263,10 @@ void draw_kid(const Gfx& g, Kid k, Vec2 feet, float scale, KidPose pose, float t
         break;
     case KidPose::Peace:
         hr = base + Vec2{S(26), -S(46)};
+        break;
+    case KidPose::BabaThrow:
+        hl = base + Vec2{-S(24), -S(48) + wave * 0.5f};
+        hr = base + Vec2{S(26), -S(60) - wave * 0.5f};
         break;
     case KidPose::Idle:
         break;
@@ -244,6 +299,15 @@ void draw_kid(const Gfx& g, Kid k, Vec2 feet, float scale, KidPose pose, float t
         tri(b + Vec2{-side * S(14), S(9)}, b + Vec2{-side * S(4), S(9)}, b + Vec2{-side * S(18), S(18)}, WHITE);
         text(g, "YALLA!", b, S(13), Color{220, 60, 40, 255}, Align::Center, false);
     }
+    if (pose == KidPose::BabaThrow) {
+        float side = feet.x > 520.0f ? -1.0f : 1.0f;
+        Vec2 b = h + Vec2{side * S(46), -S(28)};
+        DrawRectangleRounded({b.x - S(34), b.y - S(12), S(68), S(24)}, 0.6f, 8, Color{255, 238, 120, 255});
+        DrawRectangleRoundedLinesEx({b.x - S(34), b.y - S(12), S(68), S(24)}, 0.6f, 8, S(1.8f), Color{180, 70, 20, 255});
+        tri(b + Vec2{-side * S(18), S(10)}, b + Vec2{-side * S(6), S(10)}, b + Vec2{-side * S(24), S(19)},
+            Color{255, 238, 120, 255});
+        text(g, "BABA BOOM!", b, S(11.5f), Color{200, 45, 25, 255}, Align::Center, false);
+    }
     if (pose == KidPose::Peace) {
         for (int i = 0; i < 3; ++i) {
             float a = time * 2.0f + static_cast<float>(i) * 2.1f;
@@ -263,8 +327,39 @@ void draw_kid_portrait(const Gfx& g, Kid k, Vec2 c, float r, float time, bool ha
     disc(g, h + Vec2{hr * 0.95f, hr * 0.12f}, hr * 0.2f, L.skin_shade);
     disc(g, h, hr + 1.5f, Color{30, 20, 20, 255});
     disc(g, h, hr, L.skin);
-    draw_face(g, k, L, h, hr, happy ? (k == Kid::Omar ? KidPose::Rally : KidPose::Peace) : KidPose::Idle, time);
+    KidPose p = happy ? (k == Kid::Omar ? KidPose::Rally : k == Kid::Salama ? KidPose::BabaThrow : KidPose::Peace)
+                      : KidPose::Idle;
+    draw_face(g, k, L, h, hr, p, time);
     draw_hair(g, L, h, hr, false);
+}
+
+void draw_salama_head(const Gfx& g, Vec2 c, float r, float rot_deg, float time, float puff) {
+    KidLook L = look(Kid::Salama);
+    float rr = r * (1.0f + puff * 0.22f);
+    // Comedic golden glow & comic impact ring around the flying Dad head!
+    glow(g, c, rr * 2.1f, Color{255, 195, 55, 130});
+    ring(g, c, rr * (1.28f + 0.08f * std::sin(time * 18.0f)), Color{255, 225, 95, 195});
+    rlPushMatrix();
+    rlTranslatef(c.x, c.y, 0.0f);
+    rlRotatef(rot_deg, 0.0f, 0.0f, 1.0f);
+    Vec2 z{0.0f, 0.0f};
+    draw_hair(g, L, z, rr, true);
+    disc(g, {-rr * 0.96f, rr * 0.12f}, rr * 0.22f, L.skin_shade);
+    disc(g, {rr * 0.96f, rr * 0.12f}, rr * 0.22f, L.skin_shade);
+    disc(g, z, rr + std::max(2.5f, rr * 0.09f), Color{34, 22, 18, 255});
+    disc(g, z, rr, mix(L.skin, Color{255, 190, 140, 255}, puff * 0.35f));
+    draw_face(g, Kid::Salama, L, z, rr, KidPose::BabaThrow, time);
+    draw_hair(g, L, z, rr, false);
+    // Comedic cheeky 4-point cartoon gleam star near temple!
+    Vec2 sp{rr * 0.72f, -rr * 0.62f};
+    float sl = rr * (0.28f + 0.05f * std::sin(time * 16.0f));
+    float sw = sl * 0.30f;
+    tri(sp + Vec2{0, -sl}, sp + Vec2{-sw, 0}, sp + Vec2{sw, 0}, Color{255, 245, 130, 250});
+    tri(sp + Vec2{0, sl}, sp + Vec2{sw, 0}, sp + Vec2{-sw, 0}, Color{255, 245, 130, 250});
+    tri(sp + Vec2{-sl, 0}, sp + Vec2{0, sw}, sp + Vec2{0, -sw}, Color{255, 245, 130, 250});
+    tri(sp + Vec2{sl, 0}, sp + Vec2{0, -sw}, sp + Vec2{0, sw}, Color{255, 245, 130, 250});
+    disc(g, sp, sw * 0.9f, WHITE);
+    rlPopMatrix();
 }
 
 void draw_heart(Vec2 c, float s, Color col) {

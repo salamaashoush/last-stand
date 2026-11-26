@@ -36,6 +36,7 @@ struct RunResult {
     int gems{0};
     int new_stars{0};
     bool new_unlock{false};
+    std::vector<std::string> unlocks;
     RunStatsTally tally;
 };
 
@@ -62,6 +63,9 @@ struct Game {
     Music* music{nullptr};
     std::string music_name;
     float time{};
+    float sim_speed{1.0f};
+    float saved_music_vol{0.5f};
+    float saved_sfx_vol{0.8f};
     bool running{true};
     bool paused{false};
     bool persist{true};

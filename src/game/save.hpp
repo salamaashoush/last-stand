@@ -6,7 +6,7 @@
 
 namespace ls {
 
-inline constexpr int SAVE_VERSION = 1;
+inline constexpr int SAVE_VERSION = 2;
 
 template <typename T, size_t N>
 void read_array(const nlohmann::json& j, const char* key, std::array<T, N>& out) {
@@ -46,6 +46,7 @@ inline MetaProgress deserialize_meta(const std::string& text) {
     read_array(j, "unit_levels", m.unit_levels);
     for (auto& l : m.unit_levels) l = std::clamp(l, 0, UNIT_MAX_LEVEL);
     m.unit_levels[0] = std::max(1, m.unit_levels[0]);
+    m.loadout.fill(-1);
     read_array(j, "loadout", m.loadout);
     for (auto& slot : m.loadout) {
         if (slot < -1 || slot >= UNIT_COUNT || (slot >= 0 && m.unit_levels[static_cast<size_t>(slot)] == 0)) slot = -1;

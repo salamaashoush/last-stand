@@ -1,15 +1,18 @@
 #pragma once
 #include "game/cards.hpp"
+#include "game/turrets.hpp"
 #include "game/units.hpp"
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstdint>
+#include <format>
+#include <string>
 #include <vector>
 
 namespace ls {
 
-enum class MetaId : uint8_t { Recruits, Firepower, RateOfFire, Fortress, WarChest, Lucky, Count };
+enum class MetaId : uint8_t { Recruits, Firepower, RateOfFire, Fortress, WarChest, Lucky, TurretTech, Commander, Count };
 
 inline constexpr int META_COUNT = static_cast<int>(MetaId::Count);
 
@@ -28,6 +31,8 @@ inline constexpr std::array<MetaDef, META_COUNT> META_DEFS{{
     {MetaId::Fortress, "FORTRESS", "+20% wall HP", 10, 20},
     {MetaId::WarChest, "WAR CHEST", "+40 starting coins", 8, 15},
     {MetaId::Lucky, "LUCKY CHARM", "+1 card reroll per run", 3, 60},
+    {MetaId::TurretTech, "TURRET TECH", "+15% turret dmg, -6% cost", 8, 25},
+    {MetaId::Commander, "COMMANDER", "+12% XP & hero charge", 8, 30},
 }};
 
 inline const MetaDef& meta_def(MetaId id) {
@@ -70,21 +75,99 @@ inline constexpr std::array<MissionDef, 10> MISSION_DEFS{{
     {Lifetime::MostSoldiers, "ARMY OF MANY", {30, 80, 200, 500, 999}, 35},
     {Lifetime::CardsTaken, "COLLECTOR", {20, 100, 300, 800, 2000}, 25},
     {Lifetime::TurretsBuilt, "ENGINEER", {5, 25, 80, 200, 500}, 25},
-    {Lifetime::StagesCleared, "CONQUEROR", {1, 3, 6, 10, 15}, 60},
+    {Lifetime::StagesCleared, "CONQUEROR", {1, 3, 5, 8, 10}, 60},
     {Lifetime::BestEndlessWave, "ENDLESS", {10, 20, 30, 45, 60}, 60},
     {Lifetime::CoinsEarned, "TREASURER", {1000, 5000, 20000, 80000, 250000}, 25},
 }};
 
 inline constexpr int MISSION_COUNT = static_cast<int>(MISSION_DEFS.size());
-inline constexpr int MAX_STAGE = 15;
+inline constexpr int MAX_STAGE = 10;
+
+struct StageReward {
+    TurretType turret{TurretType::None};
+    UnitType unit{UnitType::Count};
+    int new_slot{0};
+    int bonus_gems{0};
+    bool endless{false};
+    bool free_upgrade{false};
+};
+
+// Every single stage clear hands the player exciting new weapons, turrets, squad slots, or free upgrades!
+inline StageReward stage_clear_reward(int cleared_stage) {
+    switch (cleared_stage) {
+    case 1:
+        return {TurretType::Tesla, UnitType::Gunner, 2, 0, false, false};
+    case 2:
+        return {TurretType::Frost, UnitType::Shotgunner, 0, 0, false, false};
+    case 3:
+        return {TurretType::Laser, UnitType::Sniper, 3, 0, true, false};
+    case 4:
+        return {TurretType::Missile, UnitType::Grenadier, 0, 0, false, false};
+    case 5:
+        return {TurretType::None, UnitType::Cryo, 4, 0, false, false};
+    case 6:
+        return {TurretType::None, UnitType::Flamer, 0, 50, false, false};
+    case 7:
+        return {TurretType::None, UnitType::Volt, 0, 75, false, false};
+    case 8:
+        return {TurretType::None, UnitType::Count, 0, 100, false, true};
+    case 9:
+        return {TurretType::None, UnitType::Count, 0, 150, false, true};
+    case 10:
+        return {TurretType::None, UnitType::Count, 0, 300, false, true};
+    default:
+        return {TurretType::None, UnitType::Count, 0, 0, false, false};
+    }
+}
+
+// Which stage clear unlocks this unit for free (0 = starter). Players can also unlock early with gems!
+inline int unit_free_clear_stage(UnitType u) {
+    switch (u) {
+    case UnitType::Rifleman:
+        return 0;
+    case UnitType::Gunner:
+        return 1;
+    case UnitType::Shotgunner:
+        return 2;
+    case UnitType::Sniper:
+        return 3;
+    case UnitType::Grenadier:
+        return 4;
+    case UnitType::Cryo:
+        return 5;
+    case UnitType::Flamer:
+        return 6;
+    case UnitType::Volt:
+        return 7;
+    case UnitType::Count:
+        return 0;
+    }
+    return 0;
+}
+
+inline std::string stage_reward_preview(int stage) {
+    StageReward rw = stage_clear_reward(stage);
+    std::string out;
+    auto add = [&](const std::string& s) {
+        if (!out.empty()) out += " + ";
+        out += s;
+    };
+    if (rw.turret != TurretType::None) add(std::format("{} TURRET", turret_def(rw.turret).name));
+    if (rw.unit != UnitType::Count) add(unit_def(rw.unit).name);
+    if (rw.new_slot > 0) add(std::format("SLOT {}", rw.new_slot));
+    if (rw.endless) add("ENDLESS");
+    if (rw.bonus_gems > 0) add(std::format("{} GEMS", rw.bonus_gems));
+    if (rw.free_upgrade) add("FREE SQUAD LV UP!");
+    return out;
+}
 
 struct MetaProgress {
     int gems{0};
     int unlocked_stage{1};
     std::array<int, META_COUNT> levels{};
     std::array<int, MAX_STAGE + 1> stars{};
-    std::array<int, UNIT_COUNT> unit_levels{1, 0, 0, 0, 0, 0};
-    std::array<int, LOADOUT_SLOTS> loadout{0, -1, -1};
+    std::array<int, UNIT_COUNT> unit_levels{1, 0, 0, 0, 0, 0, 0, 0};
+    std::array<int, LOADOUT_SLOTS> loadout{0, -1, -1, -1};
     std::array<long long, LIFETIME_COUNT> lifetime{};
     std::array<int, MISSION_COUNT> missions_claimed{};
     long long last_daily_day{-1};
@@ -113,7 +196,7 @@ struct MetaProgress {
     int unit_level(UnitType u) const { return unit_levels[static_cast<size_t>(u)]; }
     bool owns(UnitType u) const { return unit_level(u) > 0; }
 
-    int loadout_slots() const { return unlocked_stage >= 5 ? 3 : unlocked_stage >= 3 ? 2 : 1; }
+    int loadout_slots() const { return unlocked_stage >= 6 ? 4 : unlocked_stage >= 4 ? 3 : unlocked_stage >= 2 ? 2 : 1; }
 
     bool in_loadout(UnitType u) const {
         for (int i = 0; i < loadout_slots(); ++i) {
@@ -227,12 +310,66 @@ struct MetaProgress {
         return s;
     }
 
-    void finish_stage(int stage, int earned_stars) {
-        if (stage < 1 || stage > MAX_STAGE) return;
+    std::vector<std::string> finish_stage(int stage, int earned_stars) {
+        std::vector<std::string> unlocked;
+        if (stage < 1 || stage > MAX_STAGE) return unlocked;
         auto& s = stars[static_cast<size_t>(stage)];
+        bool first_clear = s == 0;
         s = std::max(s, earned_stars);
+        int prev_stage = unlocked_stage;
         unlocked_stage = std::max(unlocked_stage, std::min(stage + 1, MAX_STAGE));
         record(Lifetime::StagesCleared, stage);
+        if (!first_clear) return unlocked;
+
+        StageReward rw = stage_clear_reward(stage);
+        if (rw.turret != TurretType::None && prev_stage < turret_def(rw.turret).unlock_stage &&
+            unlocked_stage >= turret_def(rw.turret).unlock_stage) {
+            unlocked.push_back(std::format("NEW TURRET: {}", turret_def(rw.turret).name));
+        }
+        if (rw.unit != UnitType::Count) {
+            if (!owns(rw.unit)) {
+                unit_levels[static_cast<size_t>(rw.unit)] = 1;
+                // Auto-deploy into an open squad slot so the player immediately uses their new weapon!
+                int n = loadout_slots();
+                for (int i = 0; i < n; ++i) {
+                    if (loadout[static_cast<size_t>(i)] < 0) {
+                        loadout[static_cast<size_t>(i)] = static_cast<int>(rw.unit);
+                        break;
+                    }
+                }
+                unlocked.push_back(std::format("NEW WEAPON: {}", unit_def(rw.unit).name));
+            } else if (unit_level(rw.unit) < UNIT_MAX_LEVEL) {
+                // Already bought early with gems? Reward a free level-up instead!
+                unit_levels[static_cast<size_t>(rw.unit)]++;
+                unlocked.push_back(std::format("FREE UPGRADE: {} LV {}", unit_def(rw.unit).name, unit_level(rw.unit)));
+            }
+        }
+        if (rw.new_slot > 0) unlocked.push_back(std::format("SQUAD SLOT {} UNLOCKED!", rw.new_slot));
+        if (rw.endless) unlocked.push_back("ENDLESS MODE UNLOCKED!");
+        if (rw.bonus_gems > 0) {
+            gems += rw.bonus_gems;
+            unlocked.push_back(std::format("CLEAR BONUS: +{} GEMS", rw.bonus_gems));
+        }
+        if (stage == MAX_STAGE) {
+            unlocked.push_back("CAMPAIGN CHAMPION!");
+        }
+        if (rw.free_upgrade) {
+            UnitType boosted = UnitType::Count;
+            for (auto u : squad()) {
+                if (unit_level(u) < UNIT_MAX_LEVEL) {
+                    unit_levels[static_cast<size_t>(u)]++;
+                    boosted = u;
+                    break;
+                }
+            }
+            if (boosted != UnitType::Count) {
+                unlocked.push_back(std::format("FREE UPGRADE: {} LV {}", unit_def(boosted).name, unit_level(boosted)));
+            } else {
+                gems += 100;
+                unlocked.push_back("MASTERY BONUS: +100 GEMS");
+            }
+        }
+        return unlocked;
     }
 
     bool endless_unlocked() const { return stat(Lifetime::StagesCleared) >= 3; }
@@ -240,12 +377,16 @@ struct MetaProgress {
     int starting_soldiers() const { return 5 + 2 * level(MetaId::Recruits); }
     int starting_coins() const { return 40 * level(MetaId::WarChest); }
     int rerolls() const { return level(MetaId::Lucky); }
+    float turret_cost_mult() const { return std::max(0.5f, 1.0f - 0.06f * static_cast<float>(level(MetaId::TurretTech))); }
+    float xp_gain_mult() const { return 1.0f + 0.12f * static_cast<float>(level(MetaId::Commander)); }
 
     RunStats initial_stats() const {
         RunStats s;
         s.damage *= 1.0f + 0.12f * static_cast<float>(level(MetaId::Firepower));
         s.fire_rate *= 1.0f + 0.08f * static_cast<float>(level(MetaId::RateOfFire));
         s.wall_max *= 1.0f + 0.2f * static_cast<float>(level(MetaId::Fortress));
+        s.turret_damage_mult *= 1.0f + 0.15f * static_cast<float>(level(MetaId::TurretTech));
+        s.ability_charge_mult *= 1.0f + 0.12f * static_cast<float>(level(MetaId::Commander));
         return s;
     }
 };

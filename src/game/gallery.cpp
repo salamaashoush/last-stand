@@ -45,43 +45,48 @@ Run& fresh_run(Game& game) {
 
 void page_enemies(Game& game) {
     backdrop("ENEMIES  (red ring = collision radius, cross = position)");
-    const char* cols[] = {"NORMAL", "HIT FLASH", "SLOWED+ARMOR", "ELITE"};
+    const char* cols[] = {"NORMAL", "FLASH / BURROW", "FROST / ARMOR", "ELITE / CORRODE"};
     for (int c = 0; c < 4; ++c) label(game, cols[c], 150.0f + static_cast<float>(c) * 160.0f, 76);
     for (int t = 0; t < static_cast<int>(EnemyType::Count); ++t) {
         auto type = static_cast<EnemyType>(t);
-        float y = 130.0f + static_cast<float>(t) * 116.0f;
-        float r = base_stats(type).radius * (type == EnemyType::Boss ? 0.6f : 1.0f);
-        const char* names[] = {"WALKER",   "RUNNER",   "BRUTE", "EXPLODER", "SPITTER",
-                               "SHIELDER", "SPLITTER", "FLYER", "BARREL",   "BOSS x0.6"};
-        text(game.gfx, names[t], {8, y}, 14, LABEL, Align::Left, false);
+        float y = 114.0f + static_cast<float>(t) * 82.0f;
+        float r = base_stats(type).radius * (type == EnemyType::Boss ? 0.45f : 0.85f);
+        const char* names[] = {"WALKER",   "RUNNER",   "BRUTE",    "EXPLODER",  "SPITTER", "SHIELDER", "SPLITTER",
+                               "FLYER",    "BARREL",   "BOSS",     "HEALER",    "BURROWER", "BERSERKER", "WARLORD"};
+        text(game.gfx, names[t], {8, y}, 13, LABEL, Align::Left, false);
         for (int c = 0; c < 4; ++c) {
             Vec2 p{150.0f + static_cast<float>(c) * 160.0f, y};
             float shield = type == EnemyType::Shielder ? (c == 2 ? 0.3f : 1.0f) : 0.0f;
             if (type == EnemyType::Boss) {
                 draw_boss(game.gfx, make_boss(3 + c, false), c, p, r, 0.3f, c == 1 ? 0.09f : 0.0f, c == 3, game.time,
-                          c == 2 ? 0.7f : 0.0f);
+                          c == 2 ? 0.7f : 0.0f, c == 3);
             } else {
-                draw_monster(game.gfx, type, p, r, 0.3f, c == 1 ? 0.09f : 0.0f, c == 2, c == 3, game.time, shield, 0.0f,
-                             c == 2);
+                bool burrowed = type == EnemyType::Burrower && c == 1;
+                bool frozen = (type == EnemyType::Brute || type == EnemyType::Berserker) && c == 2;
+                bool corroded = (type == EnemyType::Healer || type == EnemyType::Warlord) && c == 3;
+                float rage_k = type == EnemyType::Berserker && c == 3 ? 0.85f : 0.0f;
+                draw_monster(game.gfx, type, p, r, 0.3f, c == 1 && !burrowed ? 0.09f : 0.0f, c == 2, c == 3, game.time,
+                             shield, 0.0f, c == 2 && !frozen, WHITE, 0.0f, -1, 0.0f, frozen, burrowed, corroded, false,
+                             rage_k);
             }
             DrawCircleLinesV(p.to_raylib(), r, GUIDE);
-            cross(p, 6, GUIDE);
+            cross(p, 5, GUIDE);
         }
     }
 }
 
 void page_units(Game& game) {
     backdrop("UNITS  (green dot = muzzle_offset, bullets spawn here)");
-    const char* cols[] = {"IDLE x1.3", "FIRING x1.3", "IDLE x3", "FIRING x3"};
+    const char* cols[] = {"IDLE x1.3", "FIRING x1.3", "IDLE x2.6", "FIRING x2.6"};
     for (int c = 0; c < 4; ++c) label(game, cols[c], 140.0f + static_cast<float>(c) * 150.0f, 76);
     for (int u = 0; u < UNIT_COUNT; ++u) {
-        float y = 170.0f + static_cast<float>(u) * 180.0f;
-        text(game.gfx, unit_def(static_cast<UnitType>(u)).name, {8, y - 60}, 16, LABEL, Align::Left, false);
+        float y = 148.0f + static_cast<float>(u) * 144.0f;
+        text(game.gfx, unit_def(static_cast<UnitType>(u)).name, {8, y - 48}, 14, LABEL, Align::Left, false);
         for (int c = 0; c < 4; ++c) {
-            float scale = c < 2 ? SOLDIER_SCALE : 3.0f;
+            float scale = c < 2 ? SOLDIER_SCALE : 2.6f;
             float recoil = (c % 2) ? 1.0f : 0.0f;
             Vec2 p{140.0f + static_cast<float>(c) * 150.0f, y};
-            draw_soldier(game.gfx, p, recoil, static_cast<UnitType>(u), scale, game.time);
+            draw_soldier(game.gfx, p, recoil, static_cast<UnitType>(u), scale, game.time, -1, c >= 2 ? 6 : 1);
             cross(p, 4, GUIDE);
             disc(game.gfx, p + muzzle_offset(u, scale), 3.0f, MARK);
         }
@@ -91,14 +96,14 @@ void page_units(Game& game) {
 void page_turrets(Game& game) {
     backdrop("TURRETS  (green dot = barrel tip, shots spawn here)");
     const char* cols[] = {"LV1 UP", "LV3 UP-RIGHT", "LV5 UP-LEFT"};
-    for (int c = 0; c < 3; ++c) label(game, cols[c], 140.0f + static_cast<float>(c) * 160.0f, 76);
+    for (int c = 0; c < 3; ++c) label(game, cols[c], 150.0f + static_cast<float>(c) * 165.0f, 70);
     float aims[] = {-PI / 2, -PI / 4, -PI * 0.85f};
     int levels[] = {1, 3, 5};
     for (int t = 1; t <= TURRET_KINDS; ++t) {
-        float y = 180.0f + static_cast<float>(t - 1) * 200.0f;
-        text(game.gfx, turret_def(static_cast<TurretType>(t)).name, {8, y - 70}, 16, LABEL, Align::Left, false);
+        float y = 148.0f + static_cast<float>(t - 1) * 188.0f;
+        text(game.gfx, turret_def(static_cast<TurretType>(t)).name, {8, y - 54}, 15, LABEL, Align::Left, false);
         for (int c = 0; c < 3; ++c) {
-            Vec2 p{140.0f + static_cast<float>(c) * 160.0f, y};
+            Vec2 p{150.0f + static_cast<float>(c) * 165.0f, y};
             draw_turret(game.gfx, static_cast<TurretType>(t), levels[c], p, aims[c], 0.0f, game.time, 0.8f);
             Vec2 tip = t == static_cast<int>(TurretType::Tesla)
                            ? p + TESLA_ORB
@@ -121,51 +126,55 @@ void page_gates_projectiles(Game& game) {
         draw_gate(game, g);
         DrawRectangleLinesEx({x - w / 2, y - GATE_H / 2, w, GATE_H}, 1.5f, GUIDE);
     };
-    gate(GateKind::Add, -6, false, 180, 130, 338);
-    gate(GateKind::Add, -8, true, 540, 130, 338);
-    gate(GateKind::Mul, 2, false, 180, 240, 338);
-    gate(GateKind::Mul, -2, true, 540, 240, 338);
-    gate(GateKind::Add, 12, false, 120, 350, 218);
-    gate(GateKind::Add, -40, true, 360, 350, 218);
-    gate(GateKind::Mul, 1, false, 600, 350, 218);
-    gate(GateKind::Rate, 14, false, 180, 430, 338);
-    gate(GateKind::Power, -22, true, 540, 430, 338);
+    gate(GateKind::Add, -6, false, 180, 118, 338);
+    gate(GateKind::Add, -8, true, 540, 118, 338);
+    gate(GateKind::Mul, 2, false, 180, 212, 338);
+    gate(GateKind::Mul, -2, true, 540, 212, 338);
+    gate(GateKind::Rate, 14, false, 180, 306, 338);
+    gate(GateKind::Power, -22, true, 540, 306, 338);
+    gate(GateKind::Crit, 8, false, 180, 400, 338);
+    gate(GateKind::Turret, 18, false, 540, 400, 338);
 
-    label(game, "BULLETS PER UNIT (flying up)", 360, 490);
+    label(game, "BULLETS PER UNIT (flying up)", 360, 466);
     for (int u = 0; u < UNIT_COUNT; ++u) {
         Bullet b;
-        b.pos = {80.0f + static_cast<float>(u) * 110.0f, 540};
+        b.pos = {56.0f + static_cast<float>(u) * 86.0f, 520};
         b.vel = {0, -1000};
         b.unit = static_cast<UnitType>(u);
         b.flame = unit_def(b.unit).shot == Shot::Flame;
+        b.cryo = unit_def(b.unit).shot == Shot::Cryo;
+        b.volt = unit_def(b.unit).shot == Shot::Volt;
         b.radius = b.flame ? 16.0f : b.unit == UnitType::Sniper ? 6.0f : BULLET_RADIUS;
         b.life = b.flame ? 0.2f : 1.0f;
         run.bullets.push_back(b);
-        label(game, unit_def(b.unit).name, b.pos.x, 600, 12);
+        label(game, unit_def(b.unit).name, b.pos.x, 586, 10);
     }
     Bullet crit;
-    crit.pos = {130, 700};
+    crit.pos = {80, 740};
     crit.vel = {0, -1000};
     crit.crit = true;
     run.bullets.push_back(crit);
-    label(game, "CRIT", 130, 740, 12);
+    label(game, "CRIT", 80, 790, 12);
     Bullet shard;
-    shard.pos = {250, 700};
+    shard.pos = {168, 740};
     shard.vel = {700, -300};
     shard.shard = true;
     shard.radius = 6;
     run.bullets.push_back(shard);
-    label(game, "SHARD", 250, 740, 12);
-    run.acids.push_back({{370, 700}, {0, 300}, 1});
-    label(game, "ACID", 370, 740, 12);
-    Shell grenade{{450, 820}, {450, 620}, 0.25f, 0.5f, 1, 50, false};
+    label(game, "SHARD", 168, 790, 12);
+    run.acids.push_back({{256, 740}, {0, 300}, 1});
+    label(game, "ACID", 256, 790, 12);
+    Shell grenade{{344, 830}, {344, 730}, 0.25f, 0.5f, 1, 50, false};
     grenade.grenade = true;
     run.shells.push_back(grenade);
-    label(game, "GRENADE", 450, 840, 12);
-    run.shells.push_back({{560, 820}, {560, 640}, 0.3f, 0.6f, 1, 60, false});
-    label(game, "CANNON SHELL", 560, 840, 12);
-    run.shells.push_back({{660, 600}, {660, 760}, 0.2f, 0.45f, 1, 80, true});
-    label(game, "BOMB", 660, 840, 12);
+    label(game, "GRENADE", 344, 860, 12);
+    run.shells.push_back({{444, 830}, {444, 730}, 0.3f, 0.6f, 1, 60, false});
+    label(game, "CANNON", 444, 860, 12);
+    Shell cryo{{544, 830}, {544, 730}, 0.25f, 0.5f, 1, 70, false, false, true, false};
+    run.shells.push_back(cryo);
+    label(game, "CRYO SHELL", 544, 860, 12);
+    run.shells.push_back({{648, 690}, {648, 810}, 0.2f, 0.45f, 1, 80, true});
+    label(game, "BOMB", 648, 860, 12);
     draw_shells(game, run);
     draw_projectiles(game, run);
     run.coin_flies.push_back({{130, 950}, {}, 1.0f, 1});
@@ -248,17 +257,17 @@ void page_effects(Game& game) {
 
 void page_cards(Game& game) {
     backdrop("CARDS");
-    float cw = 212.0f * 0.62f;
-    float ch = 380.0f * 0.62f;
+    float cw = 212.0f * 0.52f;
+    float ch = 380.0f * 0.52f;
     for (int i = 0; i < CARD_COUNT; ++i) {
-        int col = i % 5;
-        int row = i / 5;
-        Rectangle r{10.0f + static_cast<float>(col) * (cw + 9), 80.0f + static_cast<float>(row) * (ch + 22), cw, ch};
+        int col = i % 6;
+        int row = i / 6;
+        Rectangle r{10.0f + static_cast<float>(col) * (cw + 8), 72.0f + static_cast<float>(row) * (ch + 16), cw, ch};
         draw_card_face(game, static_cast<CardId>(i), r, i % 3);
     }
 }
 
-constexpr int THEME_SAMPLES[2][4] = {{1, 2, 3, 4}, {6, 7, 11, 14}};
+constexpr int THEME_SAMPLES[2][4] = {{1, 2, 3, 4}, {5, 6, 7, 10}};
 
 void page_themes(Game& game, int set) {
     backdrop("STAGE THEMES  (name, weather, night, decor, lock, enemy tint)");
@@ -295,9 +304,9 @@ void page_themes(Game& game, int set) {
         begin_camera(cam);
         draw_loot(game, l);
         end_camera();
-        const char* weather[] = {"CLEAR", "SNOW", "RAIN", "LEAVES", "EMBERS", "DUST", "FIREFLIES"};
+        const char* weather[] = {"CLEAR", "SNOW", "RAIN", "LEAVES", "EMBERS", "DUST", "FIREFLIES", "SPORES", "STARLIGHT"};
         const char* locks[] = {"ICE", "CRATE", "STONE", "CAGE", "CRYSTAL"};
-        const char* decor[] = {"TREES", "ROCKS", "BONES", "CRYSTALS", "RUINS"};
+        const char* decor[] = {"TREES", "ROCKS", "BONES", "CRYSTALS", "RUINS", "OBELISKS"};
         DrawRectangle(0, static_cast<int>(band_top), VIRTUAL_W, 30, Color{0, 0, 0, 150});
         text(game.gfx,
              std::format("STAGE {}: {}  |  {}{}  |  {}  |  LOCK {}", th.key, th.name,
@@ -308,13 +317,14 @@ void page_themes(Game& game, int set) {
 }
 
 void page_bosses(Game& game) {
-    backdrop("PROCEDURAL BOSSES  (stage seed -> genome + powers)");
-    int keys[] = {1, 3, 5, 7, 9, 11, 13, 15};
+    backdrop("HANDCRAFTED CAMPAIGN BOSSES  (10 signature bosses + Endless)");
+    int keys[] = {1, 2, 3, 4, 6, 7, 8, 10};
     for (int i = 0; i < 8; ++i) {
+        Theme th = make_theme(keys[i]);
         BossGenome gen = make_boss(keys[i], false);
         float x = 190.0f + static_cast<float>(i % 2) * 340.0f;
         float y = 190.0f + static_cast<float>(i / 2) * 290.0f;
-        draw_boss(game.gfx, gen, (keys[i] - 1) % 4, {x, y}, 70, 0.3f, 0, i == 5, game.time, i == 2 ? 0.8f : 0.0f);
+        draw_boss(game.gfx, gen, th.biome, {x, y}, 70, 0.3f, 0, i == 7, game.time, i == 2 ? 0.8f : 0.0f, i == 7);
         text_fit(game.gfx, gen.name, {x, y + 118}, 20, 320, Color{255, 200, 120, 255});
         std::string powers;
         for (int k = 0; k < gen.power_count; ++k) {
@@ -326,38 +336,40 @@ void page_bosses(Game& game) {
 }
 
 void page_outfits(Game& game) {
-    backdrop("THEME OUTFITS  (grass / desert / snow / ash)");
-    const char* names[] = {"GRASS", "DESERT", "SNOW", "ASH"};
-    for (int b = 0; b < 4; ++b) {
-        float y = 150.0f + static_cast<float>(b) * 290.0f;
-        text(game.gfx, names[b], {8, y - 70}, 18, LABEL, Align::Left, false);
+    backdrop("THEME OUTFITS  (6 biomes)");
+    const char* names[] = {"GRASS", "DESERT", "SNOW", "ASH", "MIRE", "ASTRAL"};
+    for (int b = 0; b < BIOME_COUNT; ++b) {
+        float y = 148.0f + static_cast<float>(b) * 198.0f;
+        text(game.gfx, names[b], {8, y - 62}, 16, LABEL, Align::Left, false);
         for (int t = 0; t < 4; ++t) {
             auto type = static_cast<EnemyType>(t);
-            draw_monster(game.gfx, type, {70.0f + static_cast<float>(t) * 82.0f, y}, base_stats(type).radius * 1.2f,
+            draw_monster(game.gfx, type, {58.0f + static_cast<float>(t) * 68.0f, y}, base_stats(type).radius * 0.95f,
                          0.3f, 0, false, false, game.time, 0, 0, false, WHITE, 0, b);
         }
         for (int u = 0; u < UNIT_COUNT; ++u) {
             draw_soldier(game.gfx,
-                         {400.0f + static_cast<float>(u % 3) * 100.0f, y - 40.0f + static_cast<float>(u / 3) * 90.0f},
-                         0, static_cast<UnitType>(u), 2.6f, game.time, b);
+                         {360.0f + static_cast<float>(u % 4) * 92.0f, y - 34.0f + static_cast<float>(u / 4) * 76.0f},
+                         0, static_cast<UnitType>(u), 1.85f, game.time, b);
         }
     }
 }
 
 void page_wall_states(Game& game) {
-    backdrop("WALL: 100% / 45% / 10% / COLLAPSE 0.3s / 0.8s / 1.4s");
-    float states[] = {1.0f, 0.45f, 0.1f, -0.3f, -0.8f, -1.4f};
+    backdrop("BIOME WALLS + TIER 1/2 SPIKES & COLLAPSE");
+    int stages[] = {1, 2, 3, 4, 5, 6};
     for (int i = 0; i < 6; ++i) {
         auto& run = fresh_run(game);
-        run.theme = make_theme(1);
+        run.theme = make_theme(stages[i]);
         run.time = 1.3f;
         run.squad = {UnitType::Rifleman, UnitType::Gunner};
-        if (states[i] > 0.0f) {
-            run.wall_hp = run.stats.wall_max * states[i];
-        } else {
-            run.wall_hp = 0;
-            run.collapse_t = -states[i];
+        if (i == 1 || i == 2) run.stats.wall_max = 1400.0f; // Tier 1 spikes
+        if (i == 3 || i == 4) run.stats.wall_max = 2200.0f; // Tier 2 spikes
+        if (i == 5) {
+            run.stats.wall_max = 2200.0f;
+            run.stats.aegis_wall = true;
+            run.wall_shield = run.wall_shield_max = 440.0f;
         }
+        run.wall_hp = run.stats.wall_max * (i == 3 ? 0.45f : 1.0f);
         float band_top = 60.0f + static_cast<float>(i) * 203.0f;
         Camera2D cam{};
         cam.zoom = 1.0f;
@@ -367,14 +379,13 @@ void page_wall_states(Game& game) {
         ClearBackground(run.theme.ground);
         DrawRectangle(0, 0, VIRTUAL_W, VIRTUAL_H, run.theme.ground);
         draw_wall(run);
-        if (run.collapse_t >= 0.0f) draw_wall_collapse(run, game.gfx);
         end_camera();
         EndScissorMode();
     }
 }
 
 void page_deaths(Game& game) {
-    backdrop("BOSS DEATH (0.2 / 0.9 / 1.6 / 2.0 / burst) + SOLDIERS LOST");
+    backdrop("BOSS DEATH (0.2..2.25s) + SOLDIERS LOST");
     float times[] = {0.2f, 0.9f, 1.6f, 2.0f, 2.25f};
     for (int i = 0; i < 5; ++i) {
         auto& run = fresh_run(game);
@@ -492,9 +503,16 @@ void gallery_prepare(Game& game, int page) {
             game.run->picking = true;
             game.run->pick_anim = 2.0f;
         }
-        if (page == 9) game.run->build_slot = 2;
+        if (page == 9) {
+            game.run->unlocked_stage = 3;
+            game.run->build_slot = 2;
+        }
         if (page == 7) {
             game.run->rage = 1.0f;
+            game.run->plane_t = 0.56f;
+            game.run->plane_y = 490.0f;
+            game.run->shells.push_back({{210, 300}, {250, 485}, 0.26f, 0.44f, 1, 92, true});
+            game.run->shells.push_back({{440, 290}, {490, 510}, 0.16f, 0.44f, 1, 92, true});
             for (int i = 0; i < 8; ++i) game.run->soldier_join[static_cast<size_t>(i)] = 0.5f;
         }
         break;
@@ -510,15 +528,34 @@ void gallery_prepare(Game& game, int page) {
     case 15:
         stage_battle(game);
         build_ground(game, game.run->theme);
+        game.run->tally.kills = 482;
+        game.run->tally.max_combo = 74;
+        game.run->tally.cards_taken = 6;
+        apply_card(game.run->stats, CardId::BulletStorm);
+        apply_card(game.run->stats, CardId::FortressOverdrive);
+        game.sim_speed = 1.5f;
         game.paused = true;
         break;
     case 14:
         g_missions.enter(game);
         break;
     case 12:
-        game.result = {true, false, 2, 10, 2, 180, 2, true, {}};
+        game.result = {true,
+                       false,
+                       1,
+                       10,
+                       3,
+                       180,
+                       3,
+                       true,
+                       {"NEW TURRET: TESLA", "NEW WEAPON: GUNNER", "SQUAD SLOT 2 UNLOCKED!"},
+                       {}};
         game.result.tally.kills = 1423;
         game.result.tally.max_soldiers = 211;
+        game.result.tally.max_combo = 64;
+        game.result.tally.gates_taken = 14;
+        game.result.tally.bosses = 2;
+        game.result.tally.damage_dealt = 185400.0;
         g_results.enter(game);
         for (int i = 0; i < 240; ++i) g_results.update(game, 1.0f / 60.0f);
         break;
@@ -566,25 +603,29 @@ void render_gallery(Game& game, int page) {
         page_deaths(game);
         break;
     case 22: {
-        backdrop("OMAR AND ALI  (idle / wave / cheer / ability + portraits)");
+        backdrop("OMAR, ALI & DAD SALAMA (poses + portraits + BABA BOOM HEAD)");
         KidPose poses[] = {KidPose::Idle, KidPose::Wave, KidPose::Cheer, KidPose::Rally};
         for (int i = 0; i < 4; ++i) {
-            KidPose p = i == 3 ? KidPose::Rally : poses[i];
-            draw_kid(game.gfx, Kid::Omar, {100.0f + static_cast<float>(i) * 170.0f, 330}, 2.2f, p, 0.4f);
-            KidPose q = i == 3 ? KidPose::Peace : poses[i];
-            draw_kid(game.gfx, Kid::Ali, {100.0f + static_cast<float>(i) * 170.0f, 700}, 2.2f, q, 0.4f);
+            float x = 115.0f + static_cast<float>(i) * 165.0f;
+            draw_kid(game.gfx, Kid::Omar, {x, 235}, 1.75f, i == 3 ? KidPose::Rally : poses[i], 0.4f);
+            draw_kid(game.gfx, Kid::Ali, {x, 475}, 1.75f, i == 3 ? KidPose::Peace : poses[i], 0.4f);
+            draw_kid(game.gfx, Kid::Salama, {x, 715}, 1.75f, i == 3 ? KidPose::BabaThrow : poses[i], 0.4f);
         }
-        label(game, "OMAR", 30, 360);
-        label(game, "ALI", 30, 730);
-        for (int i = 0; i < 2; ++i) {
-            draw_kid_portrait(game.gfx, Kid::Omar, {160.0f + static_cast<float>(i) * 140.0f, 900}, 56, 0.4f, i == 1);
-            draw_kid_portrait(game.gfx, Kid::Ali, {440.0f + static_cast<float>(i) * 140.0f, 900}, 56, 0.4f, i == 1);
-        }
-        for (int i = 0; i < 4; ++i) {
-            draw_kid(game.gfx, Kid::Omar, {120.0f + static_cast<float>(i) * 160.0f, 1180}, 1.0f, poses[i], 0.4f);
-            draw_kid(game.gfx, Kid::Ali, {170.0f + static_cast<float>(i) * 160.0f, 1180}, 1.0f,
-                     i == 3 ? KidPose::Peace : poses[i], 0.4f);
-        }
+        label(game, "OMAR", 36, 252);
+        label(game, "ALI", 36, 492);
+        label(game, "SALAMA", 42, 732);
+        // Portraits row
+        draw_kid_portrait(game.gfx, Kid::Omar, {120, 875}, 46, 0.4f, true);
+        draw_kid_portrait(game.gfx, Kid::Ali, {250, 875}, 46, 0.4f, true);
+        draw_kid_portrait(game.gfx, Kid::Salama, {380, 875}, 46, 0.4f, true);
+        // Giant spinning exploding Salama Heads!
+        draw_salama_head(game.gfx, {530, 875}, 40, -18.0f, 0.4f, 0.0f);
+        draw_salama_head(game.gfx, {640, 875}, 44, 24.0f, 0.8f, 0.85f);
+        label(game, "BABA BOOM HEADS!", 585, 955, 15);
+        // Family cheering together at the bottom!
+        draw_kid(game.gfx, Kid::Omar, {210, 1185}, 1.45f, KidPose::Cheer, 0.4f);
+        draw_kid(game.gfx, Kid::Salama, {355, 1185}, 1.55f, KidPose::BabaThrow, 0.4f);
+        draw_kid(game.gfx, Kid::Ali, {515, 1185}, 1.45f, KidPose::Peace, 0.4f);
         break;
     }
     case 21: {

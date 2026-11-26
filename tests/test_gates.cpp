@@ -69,20 +69,22 @@ TEST_CASE("hits needed per point scale with fire output", "[gates]") {
 }
 
 TEST_CASE("stat gates leave the squad size alone and move in percent", "[gates]") {
-    GateState rate{GateKind::Rate, -6, false};
-    CHECK(apply_gate(40, rate) == 40);
-    for (int i = 0; i < 100; ++i) gate_hit(rate, 1, 1.0f, 40);
-    CHECK(rate.value == STAT_MAX);
-    GateState power{GateKind::Power, -6, true};
-    for (int i = 0; i < 100; ++i) gate_hit(power, 1, 1.0f, 40);
-    CHECK(power.value == STAT_MIN);
+    for (GateKind k : {GateKind::Rate, GateKind::Power, GateKind::Crit, GateKind::Turret}) {
+        GateState g{k, -6, false};
+        CHECK(apply_gate(40, g) == 40);
+        for (int i = 0; i < 100; ++i) gate_hit(g, 1, 1.0f, 40);
+        CHECK(g.value == STAT_MAX);
+        GateState red{k, -6, true};
+        for (int i = 0; i < 100; ++i) gate_hit(red, 1, 1.0f, 40);
+        CHECK(red.value == STAT_MIN);
+    }
 }
 
 TEST_CASE("gate_after_hits matches firing the bullets one at a time", "[gates]") {
     Rng rng{11};
     for (int i = 0; i < 2000; ++i) {
         GateState g;
-        g.kind = static_cast<GateKind>(rng.range(0, 3));
+        g.kind = static_cast<GateKind>(rng.range(0, 5));
         g.red = rng.chance(0.5f);
         g.value = g.kind == GateKind::Mul ? (g.red ? -2 : rng.range(1, 2)) : -rng.range(0, 20);
         g.hit_accum = rng.range(0, 3);

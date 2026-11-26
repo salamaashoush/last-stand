@@ -44,14 +44,16 @@ TEST_CASE("enemies only answer in-run growth beyond the expected snowball", "[ba
 }
 
 TEST_CASE("formation stays inside the screen at any size", "[formation]") {
-    for (int n : {1, 5, 12, 40, 300}) {
-        int visible = visible_soldiers(n);
-        for (float x : {0.0f, 360.0f, 720.0f}) {
-            float cx = clamp_squad_x(x, visible);
-            for (int i = 0; i < visible; ++i) {
-                float sx = cx + soldier_offset(i, visible).x;
-                CHECK(sx > 0.0f);
-                CHECK(sx < static_cast<float>(VIRTUAL_W));
+    for (Formation f : {Formation::Line, Formation::Wedge, Formation::Guard}) {
+        for (int n : {1, 5, 12, 40, 300}) {
+            int visible = visible_soldiers(n);
+            for (float x : {0.0f, 360.0f, 720.0f}) {
+                float cx = clamp_squad_x(x, visible, f);
+                for (int i = 0; i < visible; ++i) {
+                    float sx = cx + soldier_offset(i, visible, f).x;
+                    CHECK(sx > 0.0f);
+                    CHECK(sx < static_cast<float>(VIRTUAL_W));
+                }
             }
         }
     }
@@ -60,8 +62,11 @@ TEST_CASE("formation stays inside the screen at any size", "[formation]") {
 }
 
 TEST_CASE("turret upgrades cost more and selling refunds half", "[turrets]") {
-    for (int l = 0; l < TURRET_MAX_LEVEL - 1; ++l) {
-        CHECK(turret_upgrade_cost(TurretType::Cannon, l + 1) > turret_upgrade_cost(TurretType::Cannon, l));
+    for (int t = 1; t <= TURRET_KINDS; ++t) {
+        auto tt = static_cast<TurretType>(t);
+        for (int l = 0; l < TURRET_MAX_LEVEL - 1; ++l) {
+            CHECK(turret_upgrade_cost(tt, l + 1) > turret_upgrade_cost(tt, l));
+        }
     }
     int spent = turret_upgrade_cost(TurretType::Tesla, 0) + turret_upgrade_cost(TurretType::Tesla, 1);
     CHECK(turret_refund(TurretType::Tesla, 2) == spent / 2);

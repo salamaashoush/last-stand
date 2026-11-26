@@ -42,12 +42,18 @@ enum class EnemyType : uint8_t {
     Flyer,
     Barrel,
     Boss,
+    Healer,
+    Burrower,
+    Berserker,
+    Warlord,
     Count
 };
 
-enum class TurretType : uint8_t { None, Cannon, Tesla, Flamer, Laser, Count };
+enum class TurretType : uint8_t { None, Cannon, Tesla, Flamer, Laser, Frost, Missile, Count };
 
-enum class GateKind : uint8_t { Add, Mul, Rate, Power };
+enum class GateKind : uint8_t { Add, Mul, Rate, Power, Crit, Turret };
+
+enum class Formation : uint8_t { Line, Wedge, Guard, Count };
 
 enum class GameStateId : uint8_t { Menu, Playing, Results, Armory, Missions };
 

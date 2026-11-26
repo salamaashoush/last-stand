@@ -72,11 +72,11 @@ void Game::update_input() {
 
 void Game::size_canvas() {
     // Quarter steps keep a browser toolbar sliding in and out from reallocating the canvas
-    // every frame; the cap bounds fill rate and memory on tablets.
-    constexpr float MAX_SCALE = 2.0f;
+    // every frame; mobile touch screens cap at 1.5x (1080x1920) to keep GPU fill-rate fast.
+    float max_scale = touch_ui ? 1.5f : 2.0f;
     float density = static_cast<float>(GetRenderWidth()) / static_cast<float>(std::max(1, GetScreenWidth()));
     float want = std::ceil(viewport.width * density / VIRTUAL_W * 4.0f) / 4.0f;
-    want = std::clamp(want, 1.0f, MAX_SCALE);
+    want = std::clamp(want, 1.0f, max_scale);
     if (canvas.id != 0 && want == canvas_scale) return;
     if (canvas.id != 0) UnloadRenderTexture(canvas);
     canvas = LoadRenderTexture(static_cast<int>(VIRTUAL_W * want), static_cast<int>(VIRTUAL_H * want));

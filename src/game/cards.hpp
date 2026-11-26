@@ -27,6 +27,14 @@ enum class CardId : uint8_t {
     Inferno,
     ThunderGod,
     Shatter,
+    Overclock,
+    FieldRepair,
+    Executioner,
+    ShockwaveRounds,
+    Adrenaline,
+    PhantomBarrage,
+    OrbitalStrike,
+    FortressOverdrive,
     Count
 };
 
@@ -65,7 +73,7 @@ inline constexpr std::array<CardDef, CARD_COUNT> CARD_DEFS{{
     {CardId::Fortify, "FORTIFY", "+30% wall HP\nand full repair", 4, 6, Rarity::Common},
     {CardId::Plunder, "PLUNDER", "+50% coins\nfrom kills", 3, 5, Rarity::Common},
     {CardId::GateMaster, "GATE MASTER", "Gates grow\ntwice as fast", 2, 4, Rarity::Rare},
-    {CardId::CallIn, "CALL IN", "A new unit type\njoins the squad", 3, 6, Rarity::Epic},
+    {CardId::CallIn, "CALL IN", "A new unit type\njoins the squad", 4, 6, Rarity::Epic},
     {CardId::BulletStorm,
      "BULLET STORM",
      "+2 bullets and\n+50% fire rate",
@@ -89,15 +97,62 @@ inline constexpr std::array<CardDef, CARD_COUNT> CARD_DEFS{{
      {{{CardId::ChainLightning, 2}, {CardId::Critical, 2}}}},
     {CardId::Shatter,
      "SHATTER",
-     "Loot foes burst\ninto ice shards",
+     "Chilled foes burst\ninto ice shards",
      1,
      30,
      Rarity::Evolution,
      {{{CardId::Cryo, 2}, {CardId::Piercing, 2}}}},
+    {CardId::Overclock, "OVERCLOCK", "+35% turret dmg\n& +25% speed", 4, 6, Rarity::Rare},
+    {CardId::FieldRepair, "ENGINEERS", "Kills heal wall\n& +30% repairs", 3, 5, Rarity::Rare},
+    {CardId::Executioner, "EXECUTIONER", "+45% vs low HP\n& +25% vs Boss", 3, 6, Rarity::Rare},
+    {CardId::ShockwaveRounds, "PULSE ROUNDS", "Every 20th shot\nblasts shockwave", 3, 4, Rarity::Epic},
+    {CardId::Adrenaline, "ADRENALINE", "Hero powers charge\n+35% faster", 3, 5, Rarity::Rare},
+    {CardId::PhantomBarrage,
+     "PHANTOM SPLIT",
+     "Shots split into\n2 seeking rounds",
+     1,
+     30,
+     Rarity::Evolution,
+     {{{CardId::Ricochet, 2}, {CardId::Piercing, 2}}}},
+    {CardId::OrbitalStrike,
+     "ORBITAL FURY",
+     "Airstrikes drop\nplasma napalm",
+     1,
+     30,
+     Rarity::Evolution,
+     {{{CardId::Airstrike, 2}, {CardId::Explosive, 2}}}},
+    {CardId::FortressOverdrive,
+     "AEGIS WALL",
+     "Energy wall shield\n& super turrets",
+     1,
+     30,
+     Rarity::Evolution,
+     {{{CardId::Fortify, 2}, {CardId::Overclock, 2}}}},
 }};
 
 inline const CardDef& card_def(CardId id) {
     return CARD_DEFS[static_cast<size_t>(id)];
+}
+
+// Finds an Evolution card that uses `id` as one of its ingredients (returns Count if none).
+inline CardId evolution_for(CardId id) {
+    for (const auto& def : CARD_DEFS) {
+        if (def.rarity != Rarity::Evolution) continue;
+        for (const auto& req : def.needs) {
+            if (req.card == id) return def.id;
+        }
+    }
+    return CardId::Count;
+}
+
+inline CardId evolution_partner(CardId id) {
+    CardId evo = evolution_for(id);
+    if (evo == CardId::Count) return CardId::Count;
+    const auto& def = card_def(evo);
+    for (const auto& req : def.needs) {
+        if (req.card != CardId::Count && req.card != id) return req.card;
+    }
+    return CardId::Count;
 }
 
 struct RunStats {
@@ -116,16 +171,28 @@ struct RunStats {
     float coin_mult{1.0f};
     float gate_growth{1.0f};
     float wall_max{1000.0f};
+    float turret_damage_mult{1.0f};
+    float turret_rate_mult{1.0f};
+    int field_repair_level{0};
+    float execute_bonus{0.0f};
+    float boss_bonus{0.0f};
+    int shockwave_level{0};
+    float ability_charge_mult{1.0f};
     bool inferno{false};
     bool thunder_god{false};
     bool shatter{false};
+    bool phantom_barrage{false};
+    bool orbital_strike{false};
+    bool aegis_wall{false};
     std::array<int, CARD_COUNT> card_levels{};
 
     int level_of(CardId id) const { return card_levels[static_cast<size_t>(id)]; }
 
     float airstrike_cooldown() const { return std::max(8.0f, 26.0f - 4.0f * static_cast<float>(airstrike_level - 1)); }
-    int airstrike_bombs() const { return 6 + 3 * (airstrike_level - 1); }
-    float airstrike_damage() const { return damage * (8.0f + 4.0f * static_cast<float>(airstrike_level - 1)); }
+    int airstrike_bombs() const { return (6 + 3 * (airstrike_level - 1)) + (orbital_strike ? 4 : 0); }
+    float airstrike_damage() const {
+        return damage * (8.0f + 4.0f * static_cast<float>(airstrike_level - 1)) * (orbital_strike ? 1.75f : 1.0f);
+    }
     float chain_interval() const { return std::max(0.35f, 1.4f - 0.2f * static_cast<float>(chain_level)); }
     int chain_targets() const { return (3 + 2 * chain_level) * (thunder_god ? 2 : 1); }
     float burn_dps() const { return damage * burn_ratio; }
@@ -135,6 +202,7 @@ struct CardEffect {
     int soldiers{0};
     float repair_fraction{0.0f};
     bool call_in{false};
+    bool grant_shield{false};
 };
 
 inline bool card_available(const RunStats& s, CardId id) {
@@ -215,6 +283,38 @@ inline CardEffect apply_card(RunStats& s, CardId id) {
     case CardId::Shatter:
         s.shatter = true;
         s.slow = std::min(0.7f, s.slow + 0.1f);
+        break;
+    case CardId::Overclock:
+        s.turret_damage_mult *= 1.35f;
+        s.turret_rate_mult *= 1.25f;
+        break;
+    case CardId::FieldRepair:
+        s.field_repair_level += 1;
+        fx.repair_fraction = 0.2f;
+        break;
+    case CardId::Executioner:
+        s.execute_bonus += 0.45f;
+        s.boss_bonus += 0.25f;
+        break;
+    case CardId::ShockwaveRounds:
+        s.shockwave_level += 1;
+        break;
+    case CardId::Adrenaline:
+        s.ability_charge_mult += 0.35f;
+        break;
+    case CardId::PhantomBarrage:
+        s.phantom_barrage = true;
+        s.ricochet += 1;
+        break;
+    case CardId::OrbitalStrike:
+        s.orbital_strike = true;
+        s.airstrike_level += 1;
+        break;
+    case CardId::FortressOverdrive:
+        s.aegis_wall = true;
+        s.turret_damage_mult *= 1.4f;
+        s.turret_rate_mult *= 1.25f;
+        fx.grant_shield = true;
         break;
     case CardId::Count:
         break;

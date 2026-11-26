@@ -15,8 +15,12 @@ void sell_turret(Game& game, int slot);
 void trigger_airstrike(Game& game);
 void trigger_frenzy(Game& game);
 void trigger_ali(Game& game);
+void trigger_salama(Game& game);
+void cycle_formation(Game& game);
 void repair_wall(Game& game);
 int repair_cost(const Run& run);
+int wall_tier(const Run& run);
+float squad_power_estimate(const Run& run);
 
 // Endless mode runs past wave 10 by rolling stage difficulty forward every ten waves.
 struct Difficulty {

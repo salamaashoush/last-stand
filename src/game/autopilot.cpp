@@ -62,7 +62,7 @@ void autopilot_update(Game& game, float dt) {
             int shots = static_cast<int>(sps * time_left * 0.5f);
             GateState future = gate_after_hits(g.state, shots, hpp, run.stats.gate_growth, run.soldiers);
             float score = static_cast<float>(apply_gate(run.soldiers, future));
-            if (future.kind == GateKind::Rate || future.kind == GateKind::Power) {
+            if (gate_is_stat(future.kind)) {
                 score = static_cast<float>(run.soldiers) * (1.0f + static_cast<float>(future.value) / 100.0f);
             }
             if (score > best) {
@@ -103,17 +103,30 @@ void autopilot_update(Game& game, float dt) {
         run.squad_target_x = threat_x / threat_w;
     }
 
+    // Smart tactical formation switching: Wedge against bosses, Guard when wall is low, Line otherwise.
+    Formation want_form = run.wall_hp < run.stats.wall_max * 0.45f ? Formation::Guard
+                          : run.boss_alive()                       ? Formation::Wedge
+                                                                   : Formation::Line;
+    if (run.formation != want_form) run.formation = want_form;
+
     trigger_airstrike(game);
     trigger_frenzy(game);
+    if (!run.enemies.empty()) trigger_salama(game);
     if (run.wall_hp < run.stats.wall_max * 0.9f) trigger_ali(game);
     if (run.wall_hp < run.stats.wall_max * 0.75f) repair_wall(game);
 
-    static const TurretType order[TURRET_SLOTS] = {TurretType::Cannon, TurretType::Tesla, TurretType::Flamer,
-                                                   TurretType::Laser};
+    static const TurretType order[TURRET_SLOTS] = {TurretType::Cannon, TurretType::Frost, TurretType::Tesla,
+                                                   TurretType::Missile};
+    static const TurretType fallback[TURRET_SLOTS] = {TurretType::Cannon, TurretType::Flamer, TurretType::Cannon,
+                                                      TurretType::Flamer};
     for (int s = 0; s < TURRET_SLOTS; ++s) {
         auto& t = run.turrets[static_cast<size_t>(s)];
-        TurretType type = t.type == TurretType::None ? order[s] : t.type;
-        if (t.level < TURRET_MAX_LEVEL && run.coins >= turret_upgrade_cost(type, t.level) + 20) {
+        TurretType pref = turret_unlocked(order[s], run.unlocked_stage) ? order[s]
+                          : turret_unlocked(TurretType::Laser, run.unlocked_stage) && s == 3 ? TurretType::Laser
+                                                                                             : fallback[s];
+        TurretType type = t.type == TurretType::None ? pref : t.type;
+        if (t.level < TURRET_MAX_LEVEL &&
+            run.coins >= turret_upgrade_cost(type, t.level, run.turret_cost_mult) + 20) {
             build_or_upgrade(game, s, type);
             break;
         }
@@ -126,8 +139,8 @@ namespace ls {
 
 void autopilot_spend(Game& game) {
     auto& m = game.meta;
-    static const MetaId priority[] = {MetaId::Firepower, MetaId::RateOfFire, MetaId::Recruits,
-                                      MetaId::Fortress,  MetaId::WarChest,   MetaId::Lucky};
+    static const MetaId priority[] = {MetaId::Firepower, MetaId::RateOfFire, MetaId::Recruits,  MetaId::TurretTech,
+                                      MetaId::Commander, MetaId::Fortress,   MetaId::WarChest, MetaId::Lucky};
     bool bought = true;
     for (int u = 1; u < UNIT_COUNT; ++u) {
         if (m.buy_unit(static_cast<UnitType>(u))) break;

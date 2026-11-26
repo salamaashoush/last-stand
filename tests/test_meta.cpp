@@ -54,7 +54,7 @@ TEST_CASE("progress survives a save round trip", "[save]") {
     m.unlocked_stage = 4;
     m.levels[static_cast<size_t>(MetaId::Firepower)] = 3;
     m.unit_levels[static_cast<size_t>(UnitType::Sniper)] = 2;
-    m.loadout = {0, 3, -1};
+    m.loadout = {0, 3, -1, -1};
     m.stars[2] = 3;
     m.record(Lifetime::Kills, 999);
     auto back = deserialize_meta(serialize_meta(m));
@@ -70,24 +70,97 @@ TEST_CASE("progress survives a save round trip", "[save]") {
 TEST_CASE("corrupt or hostile saves fall back to safe defaults", "[save]") {
     CHECK(deserialize_meta("not json").gems == 0);
     auto m = deserialize_meta(
-        R"({"gems": -50, "unlocked_stage": 99, "loadout": [7, 4, 2], "unit_levels": [0, 0, 0, 0, 0, 0]})");
+        R"({"gems": -50, "unlocked_stage": 99, "loadout": [9, 4, 2], "unit_levels": [0, 0, 0, 0, 0, 0, 0, 0]})");
     CHECK(m.gems == 0);
     CHECK(m.unlocked_stage == MAX_STAGE);
     CHECK(m.unit_level(UnitType::Rifleman) == 1);
     CHECK(m.squad() == std::vector<UnitType>{UnitType::Rifleman});
 }
 
-TEST_CASE("themes and bosses are deterministic per stage", "[theme]") {
-    for (int key = 1; key <= 15; ++key) {
+TEST_CASE("themes and bosses are deterministic and handcrafted per stage", "[theme]") {
+    std::vector<std::string> stage_names;
+    std::vector<std::string> boss_names;
+    for (int key = 1; key <= MAX_STAGE; ++key) {
         auto a = make_theme(key);
         auto b = make_theme(key);
         CHECK(a.name == b.name);
         CHECK(a.lock == b.lock);
-        CHECK(a.biome == (key - 1) % 4);
+        CHECK(a.biome >= 0);
+        CHECK(a.biome < BIOME_COUNT);
+        CHECK_FALSE(a.tagline.empty());
+        CHECK(std::ranges::find(stage_names, a.name) == stage_names.end());
+        stage_names.push_back(a.name);
         auto boss = make_boss(key, false);
         CHECK(boss.name == make_boss(key, false).name);
         CHECK(boss.power_count >= 2);
+        CHECK(std::ranges::find(boss_names, boss.name) == boss_names.end());
+        boss_names.push_back(boss.name);
         CHECK(make_boss(key, true).power_count == 1);
     }
     CHECK(make_theme(1).night == 0.0f);
+    // Paced enemy introductions: Flyers debut on Stage 2, Shielders on Stage 3, Warlords on Stage 6!
+    CHECK(wave_counts(1, 5).flyers == 0);
+    CHECK(wave_counts(2, 5).flyers > 0);
+    CHECK(wave_counts(2, 5).shielders == 0);
+    CHECK(wave_counts(3, 5).shielders > 0);
+    CHECK(wave_counts(5, 5).warlords == 0);
+    CHECK(wave_counts(6, 5).warlords > 0);
+}
+
+TEST_CASE("squad synergies activate from unit combinations", "[meta]") {
+    auto syn = compute_synergies({UnitType::Rifleman, UnitType::Gunner, UnitType::Cryo, UnitType::Volt});
+    CHECK(syn.combined_arms);
+    CHECK(syn.bullet_storm);
+    CHECK(syn.elemental_fury);
+    CHECK_FALSE(syn.heavy_ordnance);
+    CHECK(syn.count() == 3);
+}
+
+TEST_CASE("clearing stages unlocks new turrets, weapons, and squad slots progressively", "[meta]") {
+    MetaProgress m;
+    CHECK(turret_unlocked(TurretType::Cannon, m.unlocked_stage));
+    CHECK(turret_unlocked(TurretType::Flamer, m.unlocked_stage));
+    CHECK_FALSE(turret_unlocked(TurretType::Tesla, m.unlocked_stage));
+    CHECK_FALSE(turret_unlocked(TurretType::Missile, m.unlocked_stage));
+    CHECK_FALSE(m.owns(UnitType::Gunner));
+
+    auto r1 = m.finish_stage(1, 3);
+    CHECK_FALSE(r1.empty());
+    CHECK(m.unlocked_stage == 2);
+    CHECK(turret_unlocked(TurretType::Tesla, m.unlocked_stage));
+    CHECK(m.owns(UnitType::Gunner));
+    CHECK(m.in_loadout(UnitType::Gunner));
+    CHECK(m.loadout_slots() == 2);
+
+    // Replaying Stage 1 does not duplicate first-clear unlocks
+    CHECK(m.finish_stage(1, 3).empty());
+
+    auto r2 = m.finish_stage(2, 2);
+    CHECK(turret_unlocked(TurretType::Frost, m.unlocked_stage));
+    CHECK(m.owns(UnitType::Shotgunner));
+
+    auto r3 = m.finish_stage(3, 3);
+    CHECK(turret_unlocked(TurretType::Laser, m.unlocked_stage));
+    CHECK(m.owns(UnitType::Sniper));
+    CHECK(m.in_loadout(UnitType::Sniper));
+    CHECK(m.endless_unlocked());
+
+    auto r4 = m.finish_stage(4, 3);
+    CHECK(turret_unlocked(TurretType::Missile, m.unlocked_stage));
+    CHECK(m.owns(UnitType::Grenadier));
+
+    auto r5 = m.finish_stage(5, 3);
+    CHECK(m.owns(UnitType::Cryo));
+    CHECK(m.loadout_slots() == 4);
+
+    auto r6 = m.finish_stage(6, 3);
+    CHECK(m.owns(UnitType::Flamer));
+    auto r7 = m.finish_stage(7, 3);
+    CHECK(m.owns(UnitType::Volt));
+
+    // Stage 8+ grants a free squad upgrade!
+    int before_lv = m.unit_level(m.squad().front());
+    auto r8 = m.finish_stage(8, 3);
+    CHECK_FALSE(r8.empty());
+    CHECK(m.unit_level(m.squad().front()) == before_lv + 1);
 }

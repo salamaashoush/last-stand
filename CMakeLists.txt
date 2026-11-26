@@ -59,6 +59,7 @@ if(EMSCRIPTEN)
     endforeach()
     target_compile_options(${PROJECT_NAME} PRIVATE
         -Wall -Wextra -Wpedantic -fexperimental-library
+        $<$<CONFIG:Release>:-O3>
     )
     set_target_properties(${PROJECT_NAME} PROPERTIES
         SUFFIX ".html"
@@ -72,8 +73,10 @@ if(EMSCRIPTEN)
             $<TARGET_FILE_DIR:${PROJECT_NAME}>
     )
     target_link_options(${PROJECT_NAME} PRIVATE
+        $<$<CONFIG:Release>:-O3>
         "SHELL:-s USE_GLFW=3"
         "SHELL:-s WASM=1"
+        "SHELL:-s INITIAL_MEMORY=67108864"
         "SHELL:-s ALLOW_MEMORY_GROWTH=1"
         "SHELL:-s ASYNCIFY"
         ${WEB_PRELOADS}

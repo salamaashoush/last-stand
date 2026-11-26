@@ -21,7 +21,12 @@ struct GroundSlot {
     RenderTexture2D tex{};
     unsigned use{};
 };
-std::array<GroundSlot, 6> g_grounds{};
+#ifdef __EMSCRIPTEN__
+constexpr size_t GROUND_CACHE_SLOTS = 2;
+#else
+constexpr size_t GROUND_CACHE_SLOTS = 6;
+#endif
+std::array<GroundSlot, GROUND_CACHE_SLOTS> g_grounds{};
 unsigned g_ground_clock = 0;
 
 GroundSlot* find_ground(int key) {
@@ -42,15 +47,17 @@ const Texture2D* ptex(Game& g, int id) {
     case PStar:
         if (auto* t = g.assets.get_texture("p_star")) return t;
         break;
-    case PFire:
-    case PGlow:
-        return &g.gfx.glow;
-    case PRing:
-        return &g.gfx.ring;
     default:
         break;
     }
-    return &g.gfx.disc;
+    return &g.gfx.atlas;
+}
+
+Rectangle psrc(const Gfx& g, const Texture2D& t, int id) {
+    if (&t != &g.atlas) return {0, 0, static_cast<float>(t.width), static_cast<float>(t.height)};
+    if (id == PFire || id == PGlow) return g.glow_rect;
+    if (id == PRing) return g.ring_rect;
+    return g.disc_rect;
 }
 
 void sprite(const Texture2D& t, Vec2 p, float w, float h, float rot_deg, Color c) {
@@ -120,13 +127,30 @@ void draw_dress(const Gfx& g, int biome, Vec2 c, float r, float ry, float time, 
     }
     case 3: {
         ellipse(g, c + Vec2{0, -ry * 0.62f}, r * 0.7f, r * 0.28f, Color{40, 30, 30, 160});
-        BeginBlendMode(BLEND_ADDITIVE);
         float k = 0.6f + 0.4f * std::sin(time * 5.0f + c.x * 0.1f);
-        Color lava{255, 120, 40, static_cast<unsigned char>(200 * k)};
+        Color lava{255, 130, 45, static_cast<unsigned char>(215 * k)};
         line(c + Vec2{-r * 0.55f, -r * 0.1f}, c + Vec2{-r * 0.2f, r * 0.15f}, std::max(2.0f, r * 0.07f), lava);
         line(c + Vec2{-r * 0.2f, r * 0.15f}, c + Vec2{-r * 0.3f, r * 0.45f}, std::max(2.0f, r * 0.07f), lava);
         line(c + Vec2{r * 0.5f, -r * 0.3f}, c + Vec2{r * 0.25f, r * 0.05f}, std::max(2.0f, r * 0.07f), lava);
-        EndBlendMode();
+        break;
+    }
+    case 4: {
+        // Blighted Mire: glowing toxic swamp cap & spore dots.
+        Color cap{142, 215, 76, 255};
+        Vec2 top = c + Vec2{0, -ry * 0.85f};
+        ellipse(g, top, r * 0.52f + 1.5f, r * 0.24f + 1.5f, Color{34, 62, 26, 255});
+        ellipse(g, top, r * 0.52f, r * 0.24f, cap);
+        disc(g, top + Vec2{-r * 0.2f, -r * 0.04f}, r * 0.09f, Color{220, 255, 140, 255});
+        disc(g, top + Vec2{r * 0.18f, r * 0.02f}, r * 0.07f, Color{220, 255, 140, 255});
+        if (big) glow(g, top, r * 0.65f, Color{150, 255, 90, 95});
+        break;
+    }
+    case 5: {
+        // Astral Citadel: floating arcane rune halo.
+        Vec2 halo = c + Vec2{0, -ry * 1.05f + std::sin(time * 4.0f + c.x) * r * 0.06f};
+        glow(g, halo, r * 0.68f, Color{175, 115, 255, 105});
+        DrawEllipseLines(static_cast<int>(halo.x), static_cast<int>(halo.y), r * 0.5f, r * 0.16f,
+                         Color{205, 160, 255, 235});
         break;
     }
     default:
@@ -211,10 +235,8 @@ void draw_bat(const Gfx& g, Vec2 p, float r, float anim, float flash, Color body
         tri(ear + Vec2{-r * 0.14f, 0}, ear + Vec2{r * 0.14f, 0},
             ear + Vec2{static_cast<float>(side) * r * 0.08f, -r * 0.4f}, outline);
     }
-    BeginBlendMode(BLEND_ADDITIVE);
-    glow(g, p + Vec2{-r * 0.22f, -r * 0.05f}, r * 0.45f, Color{255, 50, 30, 200});
-    glow(g, p + Vec2{r * 0.22f, -r * 0.05f}, r * 0.45f, Color{255, 50, 30, 200});
-    EndBlendMode();
+    glow(g, p + Vec2{-r * 0.22f, -r * 0.05f}, r * 0.45f, Color{255, 55, 35, 195});
+    glow(g, p + Vec2{r * 0.22f, -r * 0.05f}, r * 0.45f, Color{255, 55, 35, 195});
     disc(g, p + Vec2{-r * 0.22f, -r * 0.05f}, r * 0.12f, Color{255, 220, 120, 255});
     disc(g, p + Vec2{r * 0.22f, -r * 0.05f}, r * 0.12f, Color{255, 220, 120, 255});
     tri(p + Vec2{-r * 0.16f, r * 0.25f}, p + Vec2{-r * 0.06f, r * 0.25f}, p + Vec2{-r * 0.11f, r * 0.5f}, WHITE);
@@ -228,36 +250,59 @@ void draw_bat(const Gfx& g, Vec2 p, float r, float anim, float flash, Color body
 // that tells each type apart at a glance.
 void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, float flash, bool slowed, bool elite,
                   float time, float shield_ratio, float shield_flash, bool armored, Color tint, float tint_amount,
-                  int biome, float hurt) {
+                  int biome, float hurt, bool frozen, bool burrowed, bool corroded, bool buffed, float rage_k) {
     if (type == EnemyType::Barrel) {
         draw_barrel(g, p, r, flash, 1.0f, time);
         return;
     }
     if (type == EnemyType::Flyer) {
         Color bat = blend(enemy_body_color(type), tint, tint_amount);
-        if (slowed) bat = mix(bat, Color{170, 220, 255, 255}, 0.45f);
+        if (slowed || frozen) bat = mix(bat, Color{170, 220, 255, 255}, frozen ? 0.7f : 0.45f);
         draw_bat(g, p, r, anim, flash, bat, elite, time);
         return;
     }
+    if (burrowed) {
+        // Rumbling dirt mound while underground.
+        float wobble = std::sin(time * 24.0f + p.x) * 2.5f;
+        ellipse(g, p + Vec2{0, r * 0.4f}, r * 1.15f, r * 0.45f, Color{56, 42, 28, 220});
+        ellipse(g, p + Vec2{wobble, r * 0.25f}, r * 0.92f, r * 0.36f, Color{118, 92, 62, 240});
+        ellipse(g, p + Vec2{-wobble, r * 0.12f}, r * 0.55f, r * 0.22f, Color{156, 124, 84, 230});
+        for (int k = -1; k <= 1; ++k) {
+            disc(g, p + Vec2{static_cast<float>(k) * r * 0.42f + wobble, r * 0.2f}, r * 0.14f, Color{72, 54, 36, 255});
+        }
+        return;
+    }
     Color base = blend(enemy_body_color(type), tint, tint_amount);
-    if (slowed) base = mix(base, Color{170, 220, 255, 255}, 0.45f);
+    if (rage_k > 0.05f) base = mix(base, Color{255, 50, 35, 255}, rage_k * 0.55f);
+    if (corroded) base = mix(base, Color{150, 235, 70, 255}, 0.35f);
+    if (slowed || frozen) base = mix(base, Color{170, 220, 255, 255}, frozen ? 0.65f : 0.45f);
     Color body = base;
     Color shade = darken(base, 0.38f);
     Color rim = brighten(base, 0.3f);
     Color outline = darken(base, 0.78f);
     Color inside{46, 8, 14, 255};
-    float stride = type == EnemyType::Runner ? 16.0f : 9.0f;
-    float step = std::sin(anim * stride);
+    float stride = (type == EnemyType::Runner || type == EnemyType::Berserker) ? 16.0f : 9.0f;
+    float step = frozen ? 0.0f : std::sin(anim * stride);
     float squash = type == EnemyType::Exploder ? 1.0f + std::sin(anim * 8.0f) * 0.07f : 1.0f - std::abs(step) * 0.035f;
     Vec2 c = p - Vec2{0, std::abs(step) * r * 0.06f};
     float ry = r * squash * (1.0f - 0.16f * hurt);
     float rw = r * (1.0f + 0.14f * hurt);
     float ow = std::max(2.0f, r * 0.1f);
-    bool big = type == EnemyType::Brute;
+    bool big = type == EnemyType::Brute || type == EnemyType::Warlord || type == EnemyType::Berserker;
 
+    if (type == EnemyType::Warlord) {
+        // Tight local warlord command ring (wide 190px battlefield aura is rendered in ground pass).
+        float pulse = 0.65f + 0.35f * std::sin(time * 5.0f);
+        ring(g, p, r * 1.35f + 4.0f * pulse, Color{255, 185, 65, static_cast<unsigned char>(110 * pulse)});
+    }
     ellipse(g, p + Vec2{0, r * 0.92f}, r * 1.0f, r * 0.34f, Color{0, 0, 0, 85});
+    if (buffed) glow(g, c, r * 1.9f, Color{255, 180, 60, 70});
     if (elite) glow(g, c, r * 2.3f, Color{255, 210, 60, static_cast<unsigned char>(100 + 50 * std::sin(time * 6.0f))});
     if (type == EnemyType::Exploder) glow(g, c, r * 2.1f, Color{220, 255, 80, 90});
+    if (type == EnemyType::Healer) glow(g, c, r * 2.1f, Color{90, 245, 145, 85});
+    if (rage_k > 0.2f) {
+        glow(g, c, r * (1.75f + rage_k * 0.8f), Color{255, 65, 35, static_cast<unsigned char>(135 * rage_k)});
+    }
 
     Vec2 feet[2] = {p + Vec2{-r * 0.38f, r * 0.9f + step * r * 0.08f},
                     p + Vec2{r * 0.38f, r * 0.9f - step * r * 0.08f}};
@@ -417,6 +462,75 @@ void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, flo
         jagged_mouth(g, c + Vec2{0, r * 0.45f}, r * 0.34f, r * 0.12f, outline, inside, 5, false);
         break;
     }
+    case EnemyType::Healer: {
+        // Hooded mystic shaman: draped cowl, deep shadowed face with glowing emerald eyes, rune trim, crystal staff.
+        Color robe = darken(body, 0.28f);
+        Color trim{145, 250, 175, 255};
+        // Draped hood peak & cowl framing the head.
+        tri(c + Vec2{-r * 1.02f, r * 0.12f}, c + Vec2{r * 1.02f, r * 0.12f}, c + Vec2{0, -r * 1.38f}, outline);
+        tri(c + Vec2{-r * 0.88f, r * 0.08f}, c + Vec2{r * 0.88f, r * 0.08f}, c + Vec2{0, -r * 1.2f}, robe);
+        // Dark hooded face interior so the hood wraps convincingly around the head.
+        ellipse(g, c + Vec2{0, -r * 0.05f}, r * 0.62f, r * 0.56f, Color{14, 28, 22, 255});
+        // Gold/emerald mystic hood trim & robe collar.
+        line(c + Vec2{-r * 0.65f, r * 0.42f}, c + Vec2{0, r * 0.72f}, std::max(2.0f, r * 0.11f), trim);
+        line(c + Vec2{r * 0.65f, r * 0.42f}, c + Vec2{0, r * 0.72f}, std::max(2.0f, r * 0.11f), trim);
+        disc(g, c + Vec2{0, -r * 0.62f}, r * 0.12f, trim);
+        // Glowing mystic eyes inside the shadowed cowl.
+        for (int side = -1; side <= 1; side += 2) {
+            Vec2 e = c + Vec2{static_cast<float>(side) * r * 0.26f, -r * 0.06f};
+            glow(g, e, r * 0.44f, Color{90, 255, 160, 180});
+            disc(g, e, r * 0.15f, Color{195, 255, 220, 255});
+        }
+        // Emerald crystal healing staff.
+        Vec2 staff = c + Vec2{r * 1.02f, -r * 0.48f + std::sin(time * 5.0f) * r * 0.1f};
+        line(staff + Vec2{0, r * 1.25f}, staff, std::max(2.5f, r * 0.15f), Color{52, 36, 22, 255});
+        glow(g, staff, r * 0.68f, Color{95, 255, 155, 195});
+        DrawPoly(staff.to_raylib(), 4, r * 0.3f, 0, Color{40, 120, 70, 255});
+        DrawPoly(staff.to_raylib(), 4, r * 0.22f, 0, Color{185, 255, 210, 255});
+        break;
+    }
+    case EnemyType::Burrower: {
+        // Armored mole-stalker with glowing visor eyes & ridged carapace.
+        for (int k = -1; k <= 1; ++k) {
+            ellipse(g, c + Vec2{0, -r * 0.28f + static_cast<float>(k) * r * 0.22f}, r * 0.78f, r * 0.14f,
+                    darken(body, 0.25f));
+        }
+        for (int side = -1; side <= 1; side += 2) {
+            Vec2 e = c + Vec2{static_cast<float>(side) * r * 0.3f, -r * 0.1f};
+            eye(e, r * 0.16f, Color{255, 200, 90, 255}, true);
+        }
+        jagged_mouth(g, c + Vec2{0, r * 0.42f}, r * 0.38f, r * 0.15f, outline, inside, 5, true);
+        break;
+    }
+    case EnemyType::Berserker: {
+        // Blazing crimson ravager with slanted fury eyes & warpaint.
+        for (int side = -1; side <= 1; side += 2) {
+            Vec2 e = c + Vec2{static_cast<float>(side) * r * 0.32f, -r * 0.1f};
+            glow(g, e, r * 0.55f, Color{255, 80, 30, 180});
+            eye(e, r * 0.19f, Color{255, 230, 70, 255}, true);
+            brow(e, r * 0.2f, static_cast<float>(side), 0.25f);
+        }
+        jagged_mouth(g, c + Vec2{0, r * 0.42f}, r * 0.52f, r * 0.2f, outline, inside, 7, true);
+        break;
+    }
+    case EnemyType::Warlord: {
+        // Banner-bearing commander with fluttering crimson standard.
+        Vec2 pole_b = c + Vec2{r * 0.85f, r * 0.6f};
+        Vec2 pole_t = c + Vec2{r * 0.85f, -r * 1.7f};
+        line(pole_b, pole_t, std::max(3.0f, r * 0.12f), Color{42, 34, 30, 255});
+        float wave = std::sin(time * 8.0f + p.x) * r * 0.18f;
+        tri(pole_t, pole_t + Vec2{0, r * 0.85f}, pole_t + Vec2{r * 1.15f, r * 0.42f + wave}, Color{90, 16, 18, 255});
+        tri(pole_t + Vec2{2, 4}, pole_t + Vec2{2, r * 0.78f}, pole_t + Vec2{r * 1.0f, r * 0.42f + wave},
+            Color{220, 48, 42, 255});
+        disc(g, pole_t + Vec2{r * 0.34f, r * 0.42f + wave * 0.3f}, r * 0.15f, Color{255, 210, 65, 255});
+        for (int side = -1; side <= 1; side += 2) {
+            Vec2 e = c + Vec2{static_cast<float>(side) * r * 0.3f, -r * 0.1f};
+            eye(e, r * 0.18f, Color{255, 215, 70, 255}, false);
+            brow(e, r * 0.2f, static_cast<float>(side), 0.15f);
+        }
+        jagged_mouth(g, c + Vec2{0, r * 0.42f}, r * 0.45f, r * 0.16f, outline, inside, 6, true);
+        break;
+    }
     case EnemyType::Flyer:
     case EnemyType::Barrel:
     case EnemyType::Boss:
@@ -424,7 +538,7 @@ void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, flo
         break;
     }
 
-    if (!armored) draw_dress(g, biome, c, r, ry, time, big);
+    if (!armored && type != EnemyType::Healer) draw_dress(g, biome, c, r, ry, time, big);
     if (armored) {
         ellipse(g, c + Vec2{0, -r * 0.55f}, r * 0.82f, r * 0.44f, Color{50, 54, 62, 255});
         ellipse(g, c + Vec2{0, -r * 0.6f}, r * 0.74f, r * 0.36f, Color{150, 156, 170, 255});
@@ -446,6 +560,19 @@ void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, flo
             tri({x0, cb.y - ch * 0.35f}, {x1, cb.y - ch * 0.35f}, {(x0 + x1) * 0.5f, cb.y - ch * 1.1f}, gold);
         }
         DrawRectangleRounded({cb.x - cw, cb.y - ch * 0.45f, cw * 2, ch * 0.5f}, 0.3f, 4, gold);
+    }
+    if (frozen) {
+        Rectangle ice{c.x - r * 1.15f, c.y - ry * 1.15f, r * 2.3f, ry * 2.3f};
+        DrawRectangleRounded(ice, 0.22f, 4, Color{150, 228, 255, 130});
+        DrawRectangleRoundedLinesEx(ice, 0.22f, 4, 2.5f, Color{225, 248, 255, 230});
+        line({ice.x + 4, ice.y + ice.height * 0.5f}, {ice.x + ice.width * 0.5f, ice.y + 4}, 3.5f,
+             Color{255, 255, 255, 120});
+    }
+    if (corroded) {
+        float b1 = std::fmod(time * 2.0f + p.x, 1.0f);
+        disc(g, c + Vec2{-r * 0.3f, -r * 0.4f - b1 * r * 0.5f}, r * 0.14f, Color{165, 255, 90, 200});
+        disc(g, c + Vec2{r * 0.35f, -r * 0.1f - std::fmod(b1 + 0.5f, 1.0f) * r * 0.5f}, r * 0.11f,
+             Color{165, 255, 90, 180});
     }
     if (flash > 0.0f)
         ellipse(g, c, r + ow, ry + ow,
@@ -476,8 +603,10 @@ void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, flo
 // Bosses are drawn as one silhouette: every limb's outline goes down first, then every fill,
 // so arms and shoulders grow out of the body instead of sitting on top of it.
 void draw_boss(const Gfx& g, const BossGenome& gen, int biome, Vec2 p, float r, float anim, float flash, bool enraged,
-               float time, float shield_ratio) {
-    Color base = enraged ? mix(gen.body, Color{200, 30, 20, 255}, 0.4f + 0.15f * std::sin(time * 10.0f)) : gen.body;
+               float time, float shield_ratio, bool phase2) {
+    Color base = enraged ? mix(gen.body, Color{200, 30, 20, 255}, 0.4f + 0.15f * std::sin(time * 10.0f))
+                         : phase2 ? mix(gen.body, gen.accent, 0.15f + 0.08f * std::sin(time * 6.0f))
+                                  : gen.body;
     Color body = darken(base, 0.08f);
     Color shade = darken(base, 0.42f);
     Color rim = brighten(base, 0.28f);
@@ -491,12 +620,8 @@ void draw_boss(const Gfx& g, const BossGenome& gen, int biome, Vec2 p, float r, 
     float ry = r * (1.0f - breathe * 0.5f);
     float ow = std::max(3.0f, r * 0.075f);
 
-    BeginBlendMode(BLEND_ALPHA);
     glow(g, p + Vec2{0, r * 0.4f}, r * 2.2f, Color{0, 0, 0, 110});
-    EndBlendMode();
-    BeginBlendMode(BLEND_ADDITIVE);
-    glow(g, c, r * 2.1f, with_alpha(eye, enraged ? 0.45f : 0.25f));
-    EndBlendMode();
+    glow(g, c, r * 2.1f, with_alpha(eye, enraged ? 0.45f : 0.26f));
     ellipse(g, p + Vec2{0, r * 0.98f}, rx * 1.1f, r * 0.32f, Color{0, 0, 0, 110});
 
     struct Limb {
@@ -624,9 +749,7 @@ void draw_boss(const Gfx& g, const BossGenome& gen, int biome, Vec2 p, float r, 
         float x = gen.eyes == 1 ? 0.0f : (static_cast<float>(k) - static_cast<float>(gen.eyes - 1) * 0.5f) * span;
         Vec2 e = c + Vec2{x, -ry * 0.02f};
         float slant = (x < 0 ? 1.0f : x > 0 ? -1.0f : 0.0f) * er * 0.6f;
-        BeginBlendMode(BLEND_ADDITIVE);
-        glow(g, e, er * 3.4f, with_alpha(eye, 0.75f));
-        EndBlendMode();
+        glow(g, e, er * 3.2f, with_alpha(eye, 0.72f));
         tri(e + Vec2{-er * 1.25f, -er * 0.45f - slant}, e + Vec2{er * 1.25f, -er * 0.45f + slant},
             e + Vec2{0, er * 0.8f}, Color{20, 6, 6, 255});
         tri(e + Vec2{-er * 1.0f, -er * 0.3f - slant * 0.8f}, e + Vec2{er * 1.0f, -er * 0.3f + slant * 0.8f},
@@ -639,9 +762,7 @@ void draw_boss(const Gfx& g, const BossGenome& gen, int biome, Vec2 p, float r, 
     float mh = ry * (0.2f + 0.05f * std::sin(time * 6.0f));
     ellipse(g, m, mw + ow * 0.6f, mh + ow * 0.6f, outline);
     ellipse(g, m, mw, mh, Color{50, 6, 10, 255});
-    BeginBlendMode(BLEND_ADDITIVE);
-    ellipse(g, m + Vec2{0, mh * 0.2f}, mw * 0.6f, mh * 0.5f, with_alpha(eye, 0.5f));
-    EndBlendMode();
+    ellipse(g, m + Vec2{0, mh * 0.2f}, mw * 0.6f, mh * 0.5f, with_alpha(eye, 0.45f));
     constexpr int TEETH = 6;
     for (int k = 0; k < TEETH; ++k) {
         float t = (static_cast<float>(k) + 0.5f) / TEETH - 0.5f;
@@ -672,46 +793,51 @@ void draw_boss(const Gfx& g, const BossGenome& gen, int biome, Vec2 p, float r, 
         }
         DrawRectangleRounded({cb.x - cw, cb.y - ch * 0.45f, cw * 2, ch * 0.5f}, 0.3f, 4, gold);
     }
-    if (enraged) {
-        BeginBlendMode(BLEND_ADDITIVE);
-        for (int k = 0; k < 3; ++k) {
-            float a = time * 3.0f + static_cast<float>(k) * 2.1f;
-            glow(g, c + Vec2{std::cos(a) * rx * 0.9f, -ry * 0.9f + std::sin(a * 2.0f) * r * 0.1f}, r * 0.25f,
-                 Color{255, 80, 30, 160});
+    if (phase2 || enraged) {
+        Color aura = enraged ? Color{255, 90, 35, 195} : with_alpha(brighten(gen.accent, 0.15f), 0.75f);
+        ring(g, c, r * (1.28f + 0.06f * std::sin(time * 7.0f)), aura);
+        for (int k = 0; k < 4; ++k) {
+            float a = time * 3.2f + static_cast<float>(k) * 1.57f;
+            glow(g, c + Vec2{std::cos(a) * rx * 0.95f, -ry * 0.85f + std::sin(a * 2.0f) * r * 0.12f}, r * 0.28f, aura);
         }
-        EndBlendMode();
     }
     if (flash > 0.0f)
         ellipse(g, c, rx + ow, ry + ow,
                 Color{255, 255, 255, static_cast<unsigned char>(std::min(1.0f, flash / 0.09f) * 130)});
     if (shield_ratio > 0.0f) {
-        BeginBlendMode(BLEND_ADDITIVE);
-        ring(g, c, r * 1.4f, Color{140, 190, 255, static_cast<unsigned char>(120 + 100 * shield_ratio)});
-        glow(g, c, r * 1.6f, Color{120, 170, 255, static_cast<unsigned char>(60 * shield_ratio)});
-        EndBlendMode();
+        ring(g, c, r * 1.4f, Color{140, 200, 255, static_cast<unsigned char>(130 + 100 * shield_ratio)});
+        glow(g, c, r * 1.6f, Color{120, 180, 255, static_cast<unsigned char>(70 * shield_ratio)});
     }
 }
 
-void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, float time, int biome) {
+void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, float time, int biome, int level) {
     const auto& def = unit_def(u);
     auto S = [scale](float v) { return v * scale; };
     Color dark{34, 34, 40, 255};
     Color metal{86, 88, 98, 255};
     Color skin{232, 184, 140, 255};
-    static const Color outfit[4] = {{96, 116, 64, 255}, {206, 178, 128, 255}, {236, 240, 248, 255}, {64, 62, 68, 255}};
-    Color uni = biome >= 0 && biome < 4 ? mix(def.uniform, outfit[biome], 0.35f) : def.uniform;
+    static const Color outfit[BIOME_COUNT] = {{96, 116, 64, 255},   {206, 178, 128, 255}, {236, 240, 248, 255},
+                                              {64, 62, 68, 255},    {74, 108, 72, 255},   {88, 72, 134, 255}};
+    Color uni = biome >= 0 && biome < BIOME_COUNT ? mix(def.uniform, outfit[biome], 0.3f) : def.uniform;
     Color uni_dark = darken(uni, 0.5f);
     float kick = recoil * S(3.0f);
     Vec2 hand = p + Vec2{S(6.5f), S(-2) + kick};
     float len = gun_length(static_cast<int>(u));
 
     ellipse(g, p + Vec2{0, S(8)}, S(13), S(5), Color{0, 0, 0, 80});
-    if (u == UnitType::Flamer) {
+    if (u == UnitType::Flamer || u == UnitType::Cryo) {
+        Color tank_col = u == UnitType::Cryo ? Color{110, 215, 250, 255} : Color{226, 116, 48, 255};
         for (int k = -1; k <= 1; k += 2) {
             Rectangle tank{p.x + S(static_cast<float>(k) * 4.0f) - S(3.5f), p.y + S(1), S(7), S(11)};
             DrawRectangleRounded({tank.x - S(1), tank.y - S(1), tank.width + S(2), tank.height + S(2)}, 0.6f, 6, dark);
-            DrawRectangleRounded(tank, 0.6f, 6, Color{226, 116, 48, 255});
+            DrawRectangleRounded(tank, 0.6f, 6, tank_col);
         }
+    } else if (u == UnitType::Volt) {
+        Rectangle pack{p.x - S(6.5f), p.y + S(1), S(13), S(9.5f)};
+        DrawRectangleRounded({pack.x - S(1), pack.y - S(1), pack.width + S(2), pack.height + S(2)}, 0.4f, 4, dark);
+        DrawRectangleRounded(pack, 0.4f, 4, Color{72, 56, 118, 255});
+        disc(g, p + Vec2{S(-3.5f), S(5.5f)}, S(2.0f), Color{170, 225, 255, 255});
+        disc(g, p + Vec2{S(3.5f), S(5.5f)}, S(2.0f), Color{170, 225, 255, 255});
     } else {
         Rectangle pack{p.x - S(6), p.y + S(1), S(12), S(9)};
         DrawRectangleRounded({pack.x - S(1), pack.y - S(1), pack.width + S(2), pack.height + S(2)}, 0.4f, 4, dark);
@@ -731,6 +857,11 @@ void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, f
     disc(g, head, S(7.0f), Color{20, 22, 26, 255});
     disc(g, head, S(6.0f), def.helmet);
     ring(g, head, S(4.6f), with_alpha(darken(def.helmet, 0.4f), 0.9f));
+    if (level >= 5) {
+        // Veteran gold helmet stripe for leveled Armory units!
+        line(head + Vec2{0, S(-5.5f)}, head + Vec2{0, S(4.5f)}, S(1.8f),
+             level >= 8 ? Color{135, 235, 255, 255} : Color{255, 210, 70, 255});
+    }
     disc(g, head + Vec2{S(-1.8f), S(-1.8f)}, S(2.2f), Color{255, 255, 255, 110});
     switch (biome) {
     case 0:
@@ -754,6 +885,13 @@ void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, f
         line(head + Vec2{S(-6), S(0.5f)}, head + Vec2{S(6), S(0.5f)}, S(1.6f), Color{20, 20, 24, 255});
         disc(g, head + Vec2{0, S(5)}, S(2.6f), Color{40, 40, 44, 255});
         break;
+    case 4:
+        disc(g, head + Vec2{S(-2.5f), S(1.5f)}, S(1.6f), Color{165, 245, 95, 255});
+        disc(g, head + Vec2{S(2.5f), S(1.5f)}, S(1.6f), Color{165, 245, 95, 255});
+        break;
+    case 5:
+        ring(g, head, S(6.5f), Color{190, 145, 255, 200});
+        break;
     default:
         break;
     }
@@ -775,7 +913,7 @@ void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, f
             DrawRectangleV({hand.x + S(static_cast<float>(k) * 2.2f) - S(0.9f), hand.y - S(len)}, {S(1.8f), S(len - 7)},
                            dark);
         }
-        DrawRectangleRounded({hand.x - S(10), hand.y - S(3), S(6), S(6)}, 0.3f, 4, Color{120, 104, 52, 255});
+        DrawRectangleRounded({hand.x + S(3.2f), hand.y - S(4.0f), S(5.2f), S(6.0f)}, 0.3f, 4, Color{120, 104, 52, 255});
         break;
     case UnitType::Shotgunner:
         gun(4.8f, dark);
@@ -799,15 +937,46 @@ void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, f
         glow(g, {hand.x, hand.y - S(len + 1)}, S(6) * k, Color{255, 160, 60, 220});
         break;
     }
+    case UnitType::Cryo: {
+        gun(4.2f, Color{74, 120, 152, 255});
+        DrawRectangleV({hand.x - S(1.5f), hand.y - S(len * 0.85f)}, {S(3.0f), S(len * 0.5f)}, Color{160, 235, 255, 255});
+        glow(g, {hand.x, hand.y - S(len)}, S(5.5f), Color{140, 235, 255, 200});
+        break;
+    }
+    case UnitType::Volt: {
+        gun(4.4f, Color{64, 54, 102, 255});
+        for (int r = 0; r < 3; ++r) {
+            float ry = hand.y - S(6.0f + static_cast<float>(r) * 4.2f);
+            line({hand.x - S(3.2f), ry}, {hand.x + S(3.2f), ry}, S(1.4f), Color{180, 140, 255, 255});
+        }
+        float k = 0.7f + 0.3f * std::sin(time * 30.0f);
+        glow(g, {hand.x, hand.y - S(len + 1)}, S(6.5f) * k, Color{185, 130, 255, 220});
+        break;
+    }
     case UnitType::Count:
         break;
     }
     disc(g, hand, S(2.2f), skin);
     disc(g, support, S(2.2f), skin);
 
-    if (recoil > 0.6f && def.shot == Shot::Bullet) {
+    if (recoil > 0.55f && def.shot != Shot::Flame) {
         Vec2 tip = p + muzzle_offset(static_cast<int>(u), scale) + Vec2{0, kick};
-        glow(g, tip, S(9), Color{255, 220, 120, static_cast<unsigned char>(recoil * 220)});
+        Color fc = u == UnitType::Cryo   ? Color{140, 235, 255, 255}
+                   : u == UnitType::Volt ? Color{195, 145, 255, 255}
+                   : u == UnitType::Sniper ? Color{255, 248, 195, 255}
+                                           : Color{255, 215, 105, 255};
+        float fl = (u == UnitType::Shotgunner ? 15.0f : u == UnitType::Sniper ? 14.0f : 10.5f) * recoil;
+        float fw = (u == UnitType::Shotgunner ? 7.0f : 4.2f) * recoil;
+        glow(g, tip + Vec2{0, S(-fl * 0.25f)}, S(fl * 1.15f), with_alpha(fc, recoil * 0.85f));
+        // Sharp 3-spike directional muzzle star!
+        tri(tip + Vec2{S(-fw * 0.65f), 0}, tip + Vec2{S(fw * 0.65f), 0}, tip + Vec2{0, S(-fl * 1.45f)},
+            with_alpha(fc, recoil * 0.95f));
+        tri(tip + Vec2{0, S(1.0f)}, tip + Vec2{S(-fw * 1.15f), S(-fl * 0.65f)}, tip + Vec2{S(fw * 1.15f), S(-fl * 0.65f)},
+            with_alpha(fc, recoil * 0.78f));
+        disc(g, tip + Vec2{0, S(-fl * 0.2f)}, S(fw * 0.65f), with_alpha(WHITE, recoil * 0.95f));
+        if (u == UnitType::Sniper) {
+            ring(g, tip + Vec2{0, S(-4.0f)}, S(8.5f * (1.2f - recoil * 0.4f)), with_alpha(fc, recoil * 0.7f));
+        }
     }
 }
 
@@ -819,16 +988,11 @@ void draw_wall_weather(const Run& run) {
     if (th.weather == Weather::Snow) {
         float acc = std::min(1.0f, 0.25f + t / 120.0f);
         for (float x = 4; x < VIRTUAL_W; x += 52.0f) {
-            float h = 3.0f + 7.0f * acc;
-            DrawRectangleRounded({x - 2, WALL_TOP - 16.0f - h * 0.6f, 38.0f, h}, 0.8f, 6, Color{248, 251, 255, 255});
+            float h = 2.5f + 4.5f * acc;
+            DrawRectangleRounded({x - 1, WALL_TOP - 17.0f - h * 0.5f, 36.0f, h}, 0.8f, 6, Color{248, 251, 255, 240});
         }
-        DrawRectangleRounded({0, WALL_TOP + 4, static_cast<float>(VIRTUAL_W), 3.0f + 5.0f * acc}, 0.8f, 6,
-                             Color{240, 246, 255, 235});
-        for (float x = 10; x < VIRTUAL_W; x += 46.0f) {
-            float w = 30.0f + std::fmod(x * 7.0f, 20.0f);
-            DrawEllipse(static_cast<int>(x), static_cast<int>(WALL_TOP - 14), w * (0.6f + 0.4f * acc),
-                        7.0f * acc + 2.0f, Color{244, 248, 255, 230});
-        }
+        DrawRectangleRounded({0, WALL_TOP + 5, static_cast<float>(VIRTUAL_W), 2.5f + 3.5f * acc}, 0.8f, 6,
+                             Color{240, 246, 255, 200});
     } else if (th.weather == Weather::Rain) {
         for (int i = 0; i < 14; ++i) {
             float fi = static_cast<float>(i);
@@ -841,11 +1005,10 @@ void draw_wall_weather(const Run& run) {
         DrawRectangle(0, static_cast<int>(WALL_TOP), VIRTUAL_W, static_cast<int>(WALL_BOTTOM - WALL_TOP),
                       Color{20, 30, 60, 40});
     } else if (th.weather == Weather::Dust || th.biome == 1) {
-        Color sand = th.light;
-        for (float x = -20; x < VIRTUAL_W + 20; x += 64.0f) {
-            float w = 46.0f + std::fmod(x * 13.0f, 30.0f);
-            DrawEllipse(static_cast<int>(x), static_cast<int>(WALL_TOP - 8), w, 14.0f, darken(sand, 0.12f));
-            DrawEllipse(static_cast<int>(x), static_cast<int>(WALL_TOP - 10), w * 0.85f, 10.0f, sand);
+        Color sand = with_alpha(th.light, 0.42f);
+        for (float x = 0; x < VIRTUAL_W + 40; x += 72.0f) {
+            float w = 34.0f + std::fmod(x * 13.0f, 20.0f);
+            DrawEllipse(static_cast<int>(x), static_cast<int>(WALL_TOP - 21), w, 6.0f, sand);
         }
     } else if (th.biome == 0) {
         for (float x = 6; x < VIRTUAL_W; x += 11.0f) {
@@ -862,6 +1025,42 @@ void draw_wall_weather(const Run& run) {
             DrawEllipse(static_cast<int>(x), static_cast<int>(WALL_TOP - 12), 36, 8,
                         Color{255, 90, 30, static_cast<unsigned char>(70 * k)});
         }
+        EndBlendMode();
+    } else if (th.biome == 4) {
+        // Hanging swamp vines & moss along the wall.
+        for (float x = 22; x < VIRTUAL_W; x += 58.0f) {
+            float sway = std::sin(t * 2.0f + x * 0.05f) * 4.0f;
+            line({x, WALL_TOP}, {x + sway, WALL_TOP + 28.0f + std::fmod(x * 7.0f, 18.0f)}, 3.5f,
+                 Color{56, 108, 48, 220});
+            DrawCircleV({x + sway, WALL_TOP + 16.0f}, 3.0f, Color{150, 235, 85, 200});
+        }
+    } else if (th.biome == 5) {
+        // Glowing arcane trim & flanking rune pillars placed clear of turret slots (108, 276, 444, 612).
+        float k = 0.55f + 0.45f * std::sin(t * 3.0f);
+        Color rc = with_alpha(th.accent, 0.7f * k);
+        line({0, WALL_TOP + 3}, {VIRTUAL_W, WALL_TOP + 3}, 3.0f, with_alpha(rc, 0.65f));
+        for (float x : {22.0f, 164.0f, 360.0f, 556.0f, 698.0f}) {
+            DrawRectangleRec({x - 2.5f, WALL_TOP + 12, 5, 44}, rc);
+            DrawCircleV({x, WALL_TOP + 34}, 7.0f * k, with_alpha(rc, 0.45f));
+        }
+    }
+    // Fortress banners fluttering along the battlements.
+    for (float x : {164.0f, 360.0f, 556.0f}) {
+        float wave = std::sin(t * 5.0f + x * 0.03f) * 5.0f;
+        DrawRectangleRec({x - 10, WALL_TOP + 6, 20, 34}, darken(th.accent, 0.35f));
+        tri({x - 10, WALL_TOP + 40}, {x + 10, WALL_TOP + 40}, {x + wave, WALL_TOP + 54}, darken(th.accent, 0.35f));
+        DrawRectangleRec({x - 7, WALL_TOP + 8, 14, 29}, th.accent);
+        tri({x - 7, WALL_TOP + 37}, {x + 7, WALL_TOP + 37}, {x + wave * 0.8f, WALL_TOP + 48}, th.accent);
+    }
+    // Aegis Wall regenerating energy barrier!
+    if (run.wall_shield > 0.0f && run.wall_shield_max > 0.0f) {
+        float sr = std::clamp(run.wall_shield / run.wall_shield_max, 0.0f, 1.0f);
+        float pulse = 0.7f + 0.3f * std::sin(t * 7.0f);
+        BeginBlendMode(BLEND_ADDITIVE);
+        DrawRectangleGradientV(0, static_cast<int>(WALL_TOP) - 28, VIRTUAL_W, 24, Color{90, 210, 255, 0},
+                               Color{100, 225, 255, static_cast<unsigned char>(130 * sr * pulse)});
+        line({0, WALL_TOP - 16}, {VIRTUAL_W, WALL_TOP - 16}, 4.5f,
+             Color{150, 240, 255, static_cast<unsigned char>(210 * sr)});
         EndBlendMode();
     }
 }
@@ -937,16 +1136,60 @@ void draw_wall(const Run& run) {
     Color stone = b.stone;
     float ratio = std::clamp(run.wall_hp / run.stats.wall_max, 0.0f, 1.0f);
     stone = mix(stone, Color{110, 70, 60, 255}, (1.0f - ratio) * 0.35f);
+    int wt = wall_tier(run);
+    // Biome-specific wall masonry & architectural styling!
     DrawRectangleGradientV(0, static_cast<int>(WALL_TOP), VIRTUAL_W, static_cast<int>(WALL_BOTTOM - WALL_TOP),
-                           brighten(stone, 0.1f), darken(stone, 0.25f));
-    for (int row = 0; row < 4; ++row) {
-        float y = WALL_TOP + 8.0f + static_cast<float>(row) * 17.0f;
-        DrawLineEx({0, y}, {VIRTUAL_W, y}, 2.0f, darken(stone, 0.3f));
-        for (float x = (row % 2) ? 20.0f : 50.0f; x < VIRTUAL_W; x += 60.0f) {
-            DrawLineEx({x, y}, {x, y + 17}, 2.0f, darken(stone, 0.3f));
+                           brighten(stone, 0.14f), darken(stone, 0.28f));
+    if (b.biome == 4) {
+        // Blighted Mire: vertical timber palisade logs with iron strapping.
+        for (float x = 0; x < VIRTUAL_W; x += 26.0f) {
+            Color log_c = (static_cast<int>(x / 26) % 2) ? darken(stone, 0.08f) : brighten(stone, 0.06f);
+            DrawRectangleRec({x, WALL_TOP, 24.0f, WALL_BOTTOM - WALL_TOP}, log_c);
+            DrawLineEx({x, WALL_TOP}, {x, WALL_BOTTOM}, 2.0f, darken(stone, 0.45f));
+        }
+        DrawRectangleRec({0, WALL_TOP + 16, VIRTUAL_W, 8}, Color{54, 58, 66, 255});
+        DrawRectangleRec({0, WALL_BOTTOM - 22, VIRTUAL_W, 8}, Color{54, 58, 66, 255});
+    } else {
+        for (int row = 0; row < 4; ++row) {
+            float y = WALL_TOP + 8.0f + static_cast<float>(row) * 17.0f;
+            Color mortar = b.biome == 3 ? Color{210, 75, 25, 130} : darken(stone, 0.32f);
+            DrawLineEx({0, y}, {VIRTUAL_W, y}, 2.0f, mortar);
+            for (float x = (row % 2) ? 20.0f : 50.0f; x < VIRTUAL_W; x += 60.0f) {
+                DrawLineEx({x, y}, {x, y + 17}, 2.0f, mortar);
+            }
+        }
+        if (b.biome == 0) {
+            // Verdant Frontier: timber parapet beam along the top rim.
+            DrawRectangleRec({0, WALL_TOP + 2, VIRTUAL_W, 7}, Color{118, 82, 48, 255});
+            DrawLineEx({0, WALL_TOP + 9}, {VIRTUAL_W, WALL_TOP + 9}, 2.0f, Color{64, 42, 24, 255});
+        } else if (b.biome == 1) {
+            // Scorched Badlands: desert gold sun-band inlay across the masonry.
+            DrawRectangleRec({0, WALL_TOP + 34, VIRTUAL_W, 6}, Color{218, 168, 66, 180});
+        } else if (b.biome == 5) {
+            // Astral Citadel: gilded royal trim along top & bottom edges.
+            DrawRectangleRec({0, WALL_TOP + 1, VIRTUAL_W, 5}, Color{215, 175, 85, 210});
+            DrawRectangleRec({0, WALL_BOTTOM - 10, VIRTUAL_W, 4}, Color{185, 135, 255, 170});
         }
     }
-    // Battlements break away one by one as the wall takes damage.
+    // Fortified defense wall upgrades: Tier 1+ steel armor band & front thorns spikes!
+    if (wt >= 1) {
+        Color plate = wt >= 2 ? Color{190, 170, 108, 255} : Color{118, 126, 142, 255};
+        Color edge = darken(plate, 0.55f);
+        DrawRectangleRec({0, WALL_TOP + 54, VIRTUAL_W, 12}, edge);
+        DrawRectangleRec({0, WALL_TOP + 56, VIRTUAL_W, 8}, plate);
+        for (float x = 14.0f; x < VIRTUAL_W; x += 36.0f) {
+            DrawCircleV({x, WALL_TOP + 60}, 2.2f, edge);
+        }
+        // Front defensive spikes that reflect thorns damage to melee attackers!
+        float sp_h = wt >= 2 ? 18.0f : 13.0f;
+        Color sp_col = wt >= 2 ? Color{220, 238, 255, 255} : Color{176, 186, 202, 255};
+        for (float x = 18.0f; x < VIRTUAL_W; x += 26.0f) {
+            tri({x - 6.0f, WALL_TOP - 2.0f}, {x + 6.0f, WALL_TOP - 2.0f}, {x, WALL_TOP - 2.0f - sp_h},
+                Color{32, 36, 46, 255});
+            tri({x - 4.0f, WALL_TOP - 2.0f}, {x + 4.0f, WALL_TOP - 2.0f}, {x, WALL_TOP - 1.0f - sp_h * 0.88f}, sp_col);
+        }
+    }
+    // Battlements break away one by one as the wall takes damage; shaped uniquely per biome!
     int index = 0;
     for (float x = 4; x < VIRTUAL_W; x += 52.0f, ++index) {
         float threshold = std::fmod(static_cast<float>(index) * 0.618f, 1.0f) * 0.85f;
@@ -956,8 +1199,34 @@ void draw_wall(const Run& run) {
             continue;
         }
         Rectangle m{x, WALL_TOP - 16.0f, 34.0f, 22.0f};
-        DrawRectangleRec(m, brighten(stone, 0.15f));
-        DrawRectangleLinesEx(m, 2.0f, darken(stone, 0.35f));
+        if (b.biome == 1) {
+            // Sandstone dome merlons (crisp scalloped desert battlements!)
+            Vector2 dome{m.x + m.width * 0.5f, m.y + 8.0f};
+            DrawCircleV(dome, m.width * 0.44f + 2.0f, darken(stone, 0.38f));
+            DrawCircleV(dome, m.width * 0.44f, brighten(stone, 0.20f));
+            DrawRectangleRec({m.x, m.y + 8, m.width, m.height - 8}, brighten(stone, 0.14f));
+            DrawRectangleLinesEx({m.x, m.y + 8, m.width, m.height - 8}, 2.0f, darken(stone, 0.35f));
+            DrawCircleV({dome.x, dome.y - m.width * 0.44f}, 2.5f, Color{235, 190, 80, 255});
+        } else if (b.biome == 2) {
+            // Jagged ice-capped rampart merlons
+            DrawRectangleRec(m, brighten(stone, 0.14f));
+            tri({m.x + 2, m.y}, {m.x + m.width - 2, m.y}, {m.x + m.width * 0.5f, m.y - 10}, Color{185, 232, 255, 240});
+            DrawRectangleLinesEx(m, 2.0f, darken(stone, 0.35f));
+        } else if (b.biome == 3) {
+            // Jagged volcanic obsidian teeth
+            DrawRectangleRec(m, darken(stone, 0.1f));
+            tri({m.x, m.y + 4}, {m.x + 12, m.y + 4}, {m.x + 6, m.y - 10}, Color{54, 42, 42, 255});
+            tri({m.x + 22, m.y + 4}, {m.x + 34, m.y + 4}, {m.x + 28, m.y - 10}, Color{54, 42, 42, 255});
+            DrawRectangleLinesEx(m, 2.0f, Color{220, 85, 30, 170});
+        } else if (b.biome == 5) {
+            // Enchanted Astral merlons with glowing crystal tips
+            DrawRectangleRec(m, brighten(stone, 0.12f));
+            DrawRectangleLinesEx(m, 2.0f, Color{205, 165, 90, 220});
+            DrawPoly({m.x + m.width * 0.5f, m.y - 5}, 4, 6.5f, 0, Color{195, 145, 255, 235});
+        } else {
+            DrawRectangleRec(m, brighten(stone, 0.15f));
+            DrawRectangleLinesEx(m, 2.0f, darken(stone, 0.35f));
+        }
     }
     DrawRectangle(0, static_cast<int>(WALL_BOTTOM) - 6, VIRTUAL_W, 6, darken(stone, 0.45f));
 
@@ -993,16 +1262,22 @@ void draw_wall(const Run& run) {
 }
 
 void draw_turret(const Gfx& g, TurretType type, int level, Vec2 p, float aim, float recoil, float time, float charge) {
-    Color stone{128, 124, 118, 255};
+    Color stone = level >= 5 ? Color{168, 152, 114, 255} : level >= 3 ? Color{138, 138, 146, 255} : Color{128, 124, 118, 255};
     Color steel{92, 96, 108, 255};
     Color black{22, 22, 28, 255};
+    const auto& def = turret_def(type);
+    if (level >= 5) {
+        glow(g, p, 48.0f + 5.0f * std::sin(time * 5.0f), with_alpha(def.color, 0.38f));
+    }
     DrawPoly((p + Vec2{0, 5}).to_raylib(), 8, 33, 22.5f, Color{0, 0, 0, 90});
-    DrawPoly(p.to_raylib(), 8, 33, 22.5f, darken(stone, 0.5f));
+    DrawPoly(p.to_raylib(), 8, 33, 22.5f, level >= 5 ? Color{210, 165, 50, 255} : darken(stone, 0.5f));
     DrawPoly(p.to_raylib(), 8, 30, 22.5f, stone);
     DrawPoly(p.to_raylib(), 8, 23, 22.5f, darken(stone, 0.2f));
+    if (level >= 3) ring(g, p, 29.0f, with_alpha(def.color, level >= 5 ? 0.75f : 0.4f));
     for (int k = 0; k < 8; ++k) {
         float a = static_cast<float>(k) * PI / 4.0f + PI / 8.0f;
-        disc(g, p + Vec2{std::cos(a), std::sin(a)} * 26.5f, 2.2f, darken(stone, 0.55f));
+        disc(g, p + Vec2{std::cos(a), std::sin(a)} * 26.5f, 2.2f,
+             level >= 5 ? Color{255, 215, 80, 255} : darken(stone, 0.55f));
     }
     Vec2 d{std::cos(aim), std::sin(aim)};
     Vec2 n{-d.y, d.x};
@@ -1013,27 +1288,38 @@ void draw_turret(const Gfx& g, TurretType type, int level, Vec2 p, float aim, fl
         line(from, to, w, col);
         line(from + n * (w * 0.22f), to + n * (w * 0.22f), std::max(1.0f, w * 0.22f), Color{255, 255, 255, 70});
     };
-    const auto& def = turret_def(type);
     switch (type) {
     case TurretType::Cannon: {
-        for (int k = -1; k <= 1; k += 2) {
-            Vec2 from = c + n * (static_cast<float>(k) * 6.0f);
-            barrel(from, TURRET_BARREL, 7.0f, steel);
-            Vec2 tip = from + d * (TURRET_BARREL - 3.0f);
-            line(tip, tip + d * 5.0f, 12.0f, black);
-            line(tip, tip + d * 5.0f, 9.0f, darken(steel, 0.2f));
+        int barrels = level >= 3 ? 2 : 1;
+        for (int k = 0; k < barrels; ++k) {
+            float off = barrels == 1 ? 0.0f : (k == 0 ? -6.5f : 6.5f);
+            Vec2 from = c + n * off;
+            barrel(from, TURRET_BARREL + (level >= 5 ? 4.0f : 0.0f), barrels == 1 ? 9.5f : 7.0f, steel);
+            Vec2 tip = from + d * (TURRET_BARREL - 3.0f + (level >= 5 ? 4.0f : 0.0f));
+            line(tip, tip + d * 5.0f, barrels == 1 ? 14.0f : 12.0f, black);
+            line(tip, tip + d * 5.0f, barrels == 1 ? 11.0f : 9.0f,
+                 level >= 5 ? Color{225, 180, 70, 255} : darken(steel, 0.2f));
         }
         disc(g, c, 20, black);
         disc(g, c, 18, darken(def.color, 0.15f));
         disc(g, c + d * 3.0f, 12, def.color);
+        if (level >= 5) ring(g, c, 15.5f, Color{255, 220, 85, 240});
         disc(g, c - d * 8.0f, 6, darken(def.color, 0.45f));
         disc(g, c + Vec2{-5, -5}, 4.5f, Color{255, 255, 255, 70});
         break;
     }
     case TurretType::Tesla: {
-        Color copper{208, 128, 64, 255};
-        disc(g, p, 18, black);
-        disc(g, p, 16, steel);
+        Color copper = level >= 5 ? Color{236, 194, 72, 255} : Color{208, 128, 64, 255};
+        disc(g, p, 19, black);
+        disc(g, p, 17, steel);
+        if (level >= 3) {
+            for (int side = -1; side <= 1; side += 2) {
+                Vec2 rod = p + Vec2{static_cast<float>(side) * 19.0f, -6.0f};
+                line(p + Vec2{static_cast<float>(side) * 15.0f, 6.0f}, rod, 4.5f, black);
+                line(p + Vec2{static_cast<float>(side) * 15.0f, 6.0f}, rod, 2.5f, copper);
+                disc(g, rod, 3.8f, Color{165, 232, 255, 255});
+            }
+        }
         for (int r = 0; r < 4; ++r) {
             Vec2 q = p + Vec2{0, -static_cast<float>(r) * 4.5f};
             float rr = 13.0f - static_cast<float>(r) * 2.2f;
@@ -1042,14 +1328,15 @@ void draw_turret(const Gfx& g, TurretType type, int level, Vec2 p, float aim, fl
         }
         Vec2 orb = p + TESLA_ORB;
         float k = 0.6f + 0.4f * std::sin(time * 14.0f);
-        glow(g, orb, 26.0f * k + 10.0f, Color{140, 210, 255, 210});
-        disc(g, orb, 7.5f, Color{170, 225, 255, 255});
-        disc(g, orb, 4.5f, WHITE);
+        glow(g, orb, (level >= 5 ? 34.0f : 26.0f) * k + 10.0f, Color{140, 215, 255, 220});
+        disc(g, orb, level >= 5 ? 9.0f : 7.5f, Color{170, 225, 255, 255});
+        disc(g, orb, 4.8f, WHITE);
         Rng arc{static_cast<uint64_t>(time * 20.0f) + 7};
-        for (int a = 0; a < 3; ++a) {
+        int arcs = level >= 5 ? 4 : 3;
+        for (int a = 0; a < arcs; ++a) {
             float ang = arc.uniform(0, 2 * PI);
             Vec2 mid = orb + Vec2{std::cos(ang), std::sin(ang)} * 11.0f + Vec2{arc.uniform(-3, 3), arc.uniform(-3, 3)};
-            Vec2 end = orb + Vec2{std::cos(ang), std::sin(ang)} * 21.0f;
+            Vec2 end = orb + Vec2{std::cos(ang), std::sin(ang)} * (level >= 5 ? 25.0f : 21.0f);
             line(orb, mid, 2.0f, Color{210, 240, 255, 230});
             line(mid, end, 1.5f, Color{210, 240, 255, 180});
         }
@@ -1057,30 +1344,89 @@ void draw_turret(const Gfx& g, TurretType type, int level, Vec2 p, float aim, fl
     }
     case TurretType::Flamer: {
         Vec2 tank = c - d * 14.0f;
-        line(tank - n * 9.0f, tank + n * 9.0f, 14.0f, black);
-        line(tank - n * 8.0f, tank + n * 8.0f, 11.0f, def.color);
-        line(tank - n * 8.0f + d * 2.0f, tank + n * 8.0f + d * 2.0f, 3.0f, Color{255, 220, 170, 120});
-        barrel(c, TURRET_BARREL - 6.0f, 10.0f, steel);
-        Vec2 tip = c + d * (TURRET_BARREL - 6.0f);
-        line(tip, tip + d * 6.0f, 15.0f, black);
-        line(tip, tip + d * 6.0f, 12.0f, darken(steel, 0.25f));
+        line(tank - n * 10.0f, tank + n * 10.0f, 15.0f, black);
+        line(tank - n * 9.0f, tank + n * 9.0f, 12.0f, level >= 5 ? Color{255, 110, 40, 255} : def.color);
+        line(tank - n * 9.0f + d * 2.0f, tank + n * 9.0f + d * 2.0f, 3.0f, Color{255, 220, 170, 120});
+        barrel(c, TURRET_BARREL - 5.0f, level >= 3 ? 12.0f : 10.0f, steel);
+        Vec2 tip = c + d * (TURRET_BARREL - 5.0f);
+        line(tip, tip + d * 6.0f, level >= 3 ? 18.0f : 15.0f, black);
+        line(tip, tip + d * 6.0f, level >= 3 ? 14.0f : 12.0f,
+             level >= 5 ? Color{225, 170, 60, 255} : darken(steel, 0.25f));
         float k = 0.7f + 0.3f * std::sin(time * 30.0f);
-        glow(g, c + d * TURRET_BARREL, 10.0f * k, Color{255, 150, 50, 230});
+        glow(g, c + d * (TURRET_BARREL + 1.0f), (level >= 5 ? 15.0f : 10.0f) * k, Color{255, 150, 50, 235});
         disc(g, c, 15, black);
         disc(g, c, 13, Color{100, 96, 90, 255});
+        if (level >= 3) ring(g, c, 10.0f, Color{255, 165, 55, 200});
         disc(g, c + Vec2{-4, -4}, 3.5f, Color{255, 255, 255, 60});
         break;
     }
     case TurretType::Laser: {
         for (int k = -1; k <= 1; k += 2)
-            barrel(c + n * (static_cast<float>(k) * 7.0f), TURRET_BARREL + 2.0f, 4.5f, steel);
+            barrel(c + n * (static_cast<float>(k) * 7.0f), TURRET_BARREL + (level >= 5 ? 5.0f : 2.0f),
+                   level >= 3 ? 5.5f : 4.5f, level >= 5 ? Color{155, 145, 175, 255} : steel);
+        if (level >= 3) {
+            for (int r = 1; r <= 2; ++r) {
+                Vec2 m = c + d * (10.0f + static_cast<float>(r) * 8.0f);
+                line(m - n * 9.5f, m + n * 9.5f, 3.0f, with_alpha(def.color, 0.85f));
+            }
+        }
         float glow_k = std::clamp(charge, 0.0f, 1.0f);
-        line(c, c + d * TURRET_BARREL, 3.5f, with_alpha(def.color, 0.35f + 0.65f * glow_k));
-        glow(g, c + d * TURRET_BARREL, 6.0f + 12.0f * glow_k, with_alpha(def.color, glow_k));
-        DrawPoly(c.to_raylib(), 6, 17, aim * RAD2DEG, black);
-        DrawPoly(c.to_raylib(), 6, 15, aim * RAD2DEG, darken(def.color, 0.3f));
-        disc(g, c, 9, def.color);
-        disc(g, c, 4.5f, Color{255, 235, 245, 255});
+        line(c, c + d * TURRET_BARREL, level >= 5 ? 5.0f : 3.5f, with_alpha(def.color, 0.4f + 0.6f * glow_k));
+        glow(g, c + d * TURRET_BARREL, 6.0f + 13.0f * glow_k, with_alpha(def.color, glow_k));
+        DrawPoly(c.to_raylib(), 6, 18, aim * RAD2DEG, black);
+        DrawPoly(c.to_raylib(), 6, 16, aim * RAD2DEG, level >= 5 ? Color{220, 170, 75, 255} : darken(def.color, 0.3f));
+        disc(g, c, 10, def.color);
+        disc(g, c, 5.0f, Color{255, 235, 245, 255});
+        break;
+    }
+    case TurretType::Frost: {
+        // Cryo Nova mortar: crystalline dome with rotating frost collar & Lv5 orbiting ice crystals!
+        barrel(c, TURRET_BARREL - 4.0f, level >= 3 ? 13.0f : 11.0f, Color{106, 158, 192, 255});
+        Vec2 tip = c + d * (TURRET_BARREL - 4.0f);
+        disc(g, tip, 8.0f, black);
+        disc(g, tip, 5.8f, Color{165, 240, 255, 255});
+        DrawPoly(c.to_raylib(), 6, 20, time * 25.0f, black);
+        DrawPoly(c.to_raylib(), 6, 18, time * 25.0f, level >= 5 ? Color{110, 195, 240, 255} : Color{72, 148, 192, 255});
+        DrawPoly(c.to_raylib(), 6, 12, -time * 40.0f, Color{165, 238, 255, 255});
+        if (level >= 3) {
+            for (int k = 0; k < (level >= 5 ? 4 : 2); ++k) {
+                float a = time * 2.5f + static_cast<float>(k) * (2.0f * PI / static_cast<float>(level >= 5 ? 4 : 2));
+                DrawPoly((c + Vec2{std::cos(a), std::sin(a)} * 22.0f).to_raylib(), 4, 5.0f, a * RAD2DEG,
+                         Color{205, 248, 255, 240});
+            }
+        }
+        glow(g, c, 18.0f + 5.0f * std::sin(time * 8.0f), Color{150, 238, 255, 195});
+        disc(g, c, 5.8f, WHITE);
+        break;
+    }
+    case TurretType::Missile: {
+        // Armored Homing Missile Pod: twin tubes (Lv1) -> quad rack + radar (Lv3) -> 6-tube gold siege pod (Lv5)!
+        int tubes = level >= 5 ? 3 : level >= 3 ? 2 : 2;
+        float pod_w = level >= 5 ? 24.0f : level >= 3 ? 20.0f : 16.0f;
+        Vec2 back = c - d * 12.0f;
+        Vec2 front = c + d * (TURRET_BARREL - 6.0f);
+        line(back, front, pod_w + 6.0f, black);
+        line(back, front, pod_w + 2.0f, level >= 5 ? Color{210, 155, 58, 255} : Color{86, 88, 98, 255});
+        line(back + d * 4.0f, front - d * 3.0f, pod_w - 4.0f, Color{52, 54, 62, 255});
+        // Visible red-tipped warhead cones peeking out of the front tubes!
+        for (int k = 0; k < tubes; ++k) {
+            float off = tubes == 2 ? (k == 0 ? -5.5f : 5.5f) : (static_cast<float>(k - 1) * 7.2f);
+            Vec2 tip = front + n * off + d * 4.5f;
+            disc(g, tip, 4.4f, black);
+            disc(g, tip, 3.2f, Color{255, 78, 56, 255});
+            disc(g, tip + d * 1.0f, 1.4f, Color{255, 225, 160, 255});
+            if (level >= 3) {
+                Vec2 tip2 = front - d * 6.0f + n * off;
+                disc(g, tip2, 3.6f, black);
+                disc(g, tip2, 2.5f, Color{255, 105, 65, 255});
+            }
+        }
+        // Central laser-lock radar sensor!
+        disc(g, c - d * 3.0f, 9.0f, black);
+        disc(g, c - d * 3.0f, 7.2f, darken(def.color, 0.25f));
+        float pulse = 0.6f + 0.4f * std::sin(time * 10.0f);
+        glow(g, c - d * 3.0f, (level >= 5 ? 16.0f : 11.0f) * pulse, Color{255, 110, 70, 210});
+        disc(g, c - d * 3.0f, 3.5f, Color{255, 235, 185, 255});
         break;
     }
     case TurretType::None:
@@ -1100,8 +1446,19 @@ void draw_turrets(Game& game, const Run& run) {
         const auto& t = run.turrets[static_cast<size_t>(s)];
         Vec2 p{TURRET_SLOT_X[s], TURRET_Y};
         bool selected = run.build_slot == s;
+        if (selected) {
+            TurretType preview_type =
+                t.type != TurretType::None
+                    ? t.type
+                    : TURRET_DISPLAY_ORDER[static_cast<size_t>(std::clamp(run.build_focus, 0, TURRET_KINDS - 1))];
+            float rng = turret_def(preview_type).range;
+            Color rc = turret_def(preview_type).color;
+            DrawCircleV(p.to_raylib(), rng, with_alpha(rc, 0.12f));
+            DrawCircleLinesV(p.to_raylib(), rng + 1.5f, Color{10, 12, 24, 110});
+            DrawCircleLinesV(p.to_raylib(), rng, with_alpha(rc, 0.72f));
+        }
         if (t.type == TurretType::None) {
-            int cheapest = TURRET_DEFS[0].base_cost;
+            int cheapest = turret_upgrade_cost(TURRET_DEFS[0].type, 0, run.turret_cost_mult);
             bool afford = run.coins >= cheapest;
             float pulse = afford ? 0.5f + 0.5f * std::sin(game.time * 5.0f) : 0.0f;
             Color c = afford ? Color{255, 220, 90, 255} : Color{210, 210, 210, 150};
@@ -1122,46 +1479,52 @@ void draw_op(Vec2 c, char op, float size, Color col) {
     float t = size * 0.2f;
     float h = size * 0.38f;
     Color edge{20, 16, 30, col.a};
-    std::vector<std::pair<Vec2, Vec2>> bars;
-    std::vector<Vec2> dots;
+    std::pair<Vec2, Vec2> bars[2];
+    Vec2 dots[2];
+    int bar_n = 0;
+    int dot_n = 0;
     switch (op) {
     case '+':
-        bars = {{c - Vec2{h, 0}, c + Vec2{h, 0}}, {c - Vec2{0, h}, c + Vec2{0, h}}};
+        bars[bar_n++] = {c - Vec2{h, 0}, c + Vec2{h, 0}};
+        bars[bar_n++] = {c - Vec2{0, h}, c + Vec2{0, h}};
         break;
     case '-':
-        bars = {{c - Vec2{h, 0}, c + Vec2{h, 0}}};
+        bars[bar_n++] = {c - Vec2{h, 0}, c + Vec2{h, 0}};
         break;
     case 'x':
-        bars = {{c - Vec2{h * 0.8f, h * 0.8f}, c + Vec2{h * 0.8f, h * 0.8f}},
-                {c - Vec2{h * 0.8f, -h * 0.8f}, c + Vec2{h * 0.8f, -h * 0.8f}}};
+        bars[bar_n++] = {c - Vec2{h * 0.8f, h * 0.8f}, c + Vec2{h * 0.8f, h * 0.8f}};
+        bars[bar_n++] = {c - Vec2{h * 0.8f, -h * 0.8f}, c + Vec2{h * 0.8f, -h * 0.8f}};
         break;
     case '/':
-        bars = {{c - Vec2{h, 0}, c + Vec2{h, 0}}};
-        dots = {c - Vec2{0, h * 0.75f}, c + Vec2{0, h * 0.75f}};
+        bars[bar_n++] = {c - Vec2{h, 0}, c + Vec2{h, 0}};
+        dots[dot_n++] = c - Vec2{0, h * 0.75f};
+        dots[dot_n++] = c + Vec2{0, h * 0.75f};
         break;
     default:
         break;
     }
-    for (const auto& [a, b] : bars) line(a, b, t + 4.0f, edge);
-    for (const auto& d : dots) DrawCircleV(d.to_raylib(), t * 0.75f + 2.0f, edge);
-    for (const auto& [a, b] : bars) line(a, b, t, col);
-    for (const auto& d : dots) DrawCircleV(d.to_raylib(), t * 0.75f, col);
+    for (int i = 0; i < bar_n; ++i) line(bars[i].first, bars[i].second, t + 4.0f, edge);
+    for (int i = 0; i < dot_n; ++i) DrawCircleV(dots[i].to_raylib(), t * 0.75f + 2.0f, edge);
+    for (int i = 0; i < bar_n; ++i) line(bars[i].first, bars[i].second, t, col);
+    for (int i = 0; i < dot_n; ++i) DrawCircleV(dots[i].to_raylib(), t * 0.75f, col);
 }
 
 void draw_gate(Game& game, const Gate& gate) {
     const auto& g = game.gfx;
     bool good = !gate.state.red;
     bool mul = gate.state.kind == GateKind::Mul;
-    Color base = good ? (mul ? Color{110, 90, 255, 255} : Color{40, 150, 255, 255}) : Color{230, 56, 60, 255};
+    bool special = gate.state.kind == GateKind::Crit || gate.state.kind == GateKind::Turret;
+    Color base = !good    ? Color{230, 56, 60, 255}
+                 : mul    ? Color{110, 90, 255, 255}
+                 : special ? Color{48, 185, 130, 255}
+                           : Color{40, 150, 255, 255};
     bool negative = gate.state.value < 0 || (mul && gate.state.value == 1);
     float s = 1.0f + gate.pulse * 0.08f;
     Rectangle r{gate.x - gate.w * 0.5f * s, gate.y - GATE_H * 0.5f * s, gate.w * s, GATE_H * s};
     float rnd = 0.3f;
 
     if (good && !negative) {
-        BeginBlendMode(BLEND_ADDITIVE);
-        glow(g, {gate.x, gate.y}, gate.w * 0.55f, with_alpha(base, 0.35f));
-        EndBlendMode();
+        glow(g, {gate.x, gate.y}, gate.w * 0.55f, with_alpha(base, 0.32f));
     }
     DrawRectangleRounded({r.x, r.y + 6, r.width, r.height}, rnd, 6, Color{0, 0, 0, 70});
     DrawRectangleRounded({r.x - 4, r.y - 4, r.width + 8, r.height + 8}, rnd, 6, darken(base, 0.6f));
@@ -1198,23 +1561,27 @@ void draw_gate(Game& game, const Gate& gate) {
     }
     char op = '+';
     int magnitude = std::abs(gate.state.value);
-    bool stat = gate.state.kind == GateKind::Rate || gate.state.kind == GateKind::Power;
+    bool stat = gate_is_stat(gate.state.kind);
     if (mul)
         op = gate.state.value > 0 ? 'x' : '/';
     else if (gate.state.value < 0)
         op = '-';
     std::string num = stat ? std::format("{}%", magnitude) : std::format("{}", magnitude);
     if (stat) {
-        text(g, gate.state.kind == GateKind::Rate ? "FIRE RATE" : "DAMAGE", {gate.x, r.y + 11}, 15,
-             Color{255, 255, 255, 230}, Align::Center, false);
+        const char* hdr = gate.state.kind == GateKind::Rate    ? "FIRE RATE"
+                          : gate.state.kind == GateKind::Power ? "DAMAGE"
+                          : gate.state.kind == GateKind::Crit  ? "CRIT CHANCE"
+                                                               : "TURRET DMG";
+        text(g, hdr, {gate.x, r.y + 13}, 14, Color{255, 255, 255, 245}, Align::Center, true);
     }
-    float size = 44.0f * s;
+    float size = (stat ? 31.0f : 44.0f) * s;
+    float num_y = stat ? gate.y + 11.0f : gate.y + 1.0f;
     float tw = text_width(g, num, size);
     float gap = size * 0.72f;
     float total = tw + gap + size * 0.38f;
-    Vec2 op_at{gate.x - total * 0.5f + size * 0.38f, gate.y + 1};
+    Vec2 op_at{gate.x - total * 0.5f + size * 0.38f, num_y};
     draw_op(op_at, op, size, WHITE);
-    text(g, num, {op_at.x + gap + tw * 0.5f, gate.y + 2}, size, WHITE);
+    text(g, num, {op_at.x + gap + tw * 0.5f, num_y + 1.0f}, size, WHITE);
     if (mul) {
         float k = static_cast<float>(gate.state.points) / static_cast<float>(MUL_STEP_POINTS);
         Color fill = gate.state.red ? Color{255, 90, 80, 255} : Color{120, 255, 150, 255};
@@ -1278,9 +1645,7 @@ void draw_loot(Game& game, const Loot& f) {
     Rectangle r{c.x - half, c.y - half, LOOT_SIZE, LOOT_SIZE};
     Color accent = lock_color(f.lock);
     float ratio = std::clamp(f.hp / f.max_hp, 0.0f, 1.0f);
-    BeginBlendMode(BLEND_ADDITIVE);
     glow(g, c, LOOT_SIZE * 1.1f, with_alpha(brighten(accent, 0.3f), 0.25f + 0.12f * std::sin(game.time * 4.0f)));
-    EndBlendMode();
     ellipse(g, f.pos + Vec2{0, half + 8}, half * 0.9f, 8, Color{0, 0, 0, 70});
 
     bool light_cracks = f.lock == LockKind::Ice || f.lock == LockKind::Crystal;
@@ -1386,10 +1751,23 @@ void draw_particles(Game& game, const Run& run, bool additive) {
         bool add = p.additive || p.tex == PFire || p.tex == PGlow || p.tex == PStar || p.tex == PRing;
         if (add != additive) continue;
         float k = 1.0f - p.life / p.max_life;
-        float size = p.size + (p.size_end - p.size) * k;
+        // Fast explosive ease-out for shockwave rings so blast waves snap outward realistically!
+        float ek = p.tex == PRing ? 1.0f - (1.0f - k) * (1.0f - k) : k;
+        float size = p.size + (p.size_end - p.size) * ek;
+        if (size <= 0.1f) continue;
         float alpha =
             p.zgrav > 0.0f ? std::min(1.0f, p.life / (p.max_life * 0.3f)) : std::min(1.0f, p.life / p.max_life * 1.6f);
-        const Texture2D* t = ptex(game, p.tex);
+        if (p.streak) {
+            float spd = p.vel.length();
+            if (spd > 15.0f) {
+                Vec2 dir = p.vel * (1.0f / spd);
+                float len = std::clamp(spd * 0.048f, 6.0f, 34.0f) * (1.0f - k * 0.45f);
+                Vec2 tail = p.pos - dir * len;
+                line(tail, p.pos, size * 1.75f, with_alpha(p.color, alpha * 0.55f));
+                line(p.pos - dir * (len * 0.65f), p.pos, size * 0.72f, with_alpha(WHITE, alpha * 0.95f));
+            }
+            continue;
+        }
         if (p.zgrav > 0.0f) {
             ellipse(game.gfx, p.pos + Vec2{0, size * 0.4f}, size * 0.9f, size * 0.4f,
                     Color{0, 0, 0, static_cast<unsigned char>(60 * alpha)});
@@ -1404,15 +1782,23 @@ void draw_particles(Game& game, const Run& run, bool additive) {
             }
             continue;
         }
-        sprite(*t, p.pos, size * 2.0f, size * 2.0f, p.rot, with_alpha(p.color, alpha));
+        const Texture2D* t = ptex(game, p.tex);
+        Rectangle src = psrc(game.gfx, *t, p.tex);
+        float d = size * 2.0f;
+        DrawTexturePro(*t, src, {p.pos.x, p.pos.y, d, d}, {size, size}, p.rot, with_alpha(p.color, alpha));
     }
 }
 
 void draw_ambient(Game& game, const Theme& th, float time) {
     const auto& g = game.gfx;
+#ifdef __EMSCRIPTEN__
+    int step = 2;
+#else
+    int step = game.touch_ui ? 2 : 1;
+#endif
     switch (th.weather) {
     case Weather::Snow:
-        for (int i = 0; i < 80; ++i) {
+        for (int i = 0; i < 80; i += step) {
             float fi = static_cast<float>(i);
             float x = std::fmod(fi * 97.0f + std::sin(time * 0.7f + fi) * 30.0f + time * 15.0f, VIRTUAL_W);
             float y = std::fmod(fi * 173.0f + time * (40.0f + std::fmod(fi * 7.0f, 30.0f)), WALL_TOP);
@@ -1421,7 +1807,7 @@ void draw_ambient(Game& game, const Theme& th, float time) {
         break;
     case Weather::Embers:
         BeginBlendMode(BLEND_ADDITIVE);
-        for (int i = 0; i < 45; ++i) {
+        for (int i = 0; i < 45; i += step) {
             float fi = static_cast<float>(i);
             float x = std::fmod(fi * 131.0f + std::sin(time + fi) * 20.0f, VIRTUAL_W);
             float y = WALL_TOP - std::fmod(fi * 211.0f + time * (30.0f + std::fmod(fi * 5.0f, 25.0f)), WALL_TOP);
@@ -1430,7 +1816,7 @@ void draw_ambient(Game& game, const Theme& th, float time) {
         EndBlendMode();
         break;
     case Weather::Leaves:
-        for (int i = 0; i < 16; ++i) {
+        for (int i = 0; i < 16; i += step) {
             float fi = static_cast<float>(i);
             float x = std::fmod(fi * 211.0f + time * 25.0f, VIRTUAL_W + 40) - 20;
             float y = std::fmod(fi * 337.0f + time * 35.0f, WALL_TOP);
@@ -1438,7 +1824,7 @@ void draw_ambient(Game& game, const Theme& th, float time) {
         }
         break;
     case Weather::Rain:
-        for (int i = 0; i < 90; ++i) {
+        for (int i = 0; i < 90; i += step) {
             float fi = static_cast<float>(i);
             float x = std::fmod(fi * 89.0f + time * 120.0f, VIRTUAL_W + 60) - 30;
             float y = std::fmod(fi * 151.0f + time * 900.0f, WALL_TOP);
@@ -1447,7 +1833,7 @@ void draw_ambient(Game& game, const Theme& th, float time) {
         break;
     case Weather::Dust:
         DrawRectangle(0, 0, VIRTUAL_W, static_cast<int>(WALL_TOP), Color{220, 180, 120, 26});
-        for (int i = 0; i < 50; ++i) {
+        for (int i = 0; i < 50; i += step) {
             float fi = static_cast<float>(i);
             float x = std::fmod(fi * 67.0f + time * (90.0f + std::fmod(fi * 13.0f, 60.0f)), VIRTUAL_W + 40) - 20;
             float y = std::fmod(fi * 193.0f + std::sin(time + fi) * 12.0f, WALL_TOP);
@@ -1456,12 +1842,36 @@ void draw_ambient(Game& game, const Theme& th, float time) {
         break;
     case Weather::Fireflies:
         BeginBlendMode(BLEND_ADDITIVE);
-        for (int i = 0; i < 26; ++i) {
+        for (int i = 0; i < 26; i += step) {
             float fi = static_cast<float>(i);
             float x = std::fmod(fi * 131.0f + std::sin(time * 0.6f + fi) * 40.0f, VIRTUAL_W);
             float y = std::fmod(fi * 233.0f + std::cos(time * 0.5f + fi * 2.0f) * 30.0f, WALL_TOP);
             float blink = 0.5f + 0.5f * std::sin(time * 3.0f + fi * 1.7f);
             glow(g, {x, y}, 8.0f, Color{200, 255, 120, static_cast<unsigned char>(200 * blink)});
+        }
+        EndBlendMode();
+        break;
+    case Weather::Spores:
+        BeginBlendMode(BLEND_ADDITIVE);
+        for (int i = 0; i < 38; i += step) {
+            float fi = static_cast<float>(i);
+            float x = std::fmod(fi * 113.0f + std::sin(time * 0.8f + fi) * 35.0f, VIRTUAL_W);
+            float y = WALL_TOP - std::fmod(fi * 197.0f + time * (16.0f + std::fmod(fi * 5.0f, 18.0f)), WALL_TOP);
+            float pulse = 0.55f + 0.45f * std::sin(time * 2.4f + fi);
+            glow(g, {x, y}, 7.0f + 3.0f * pulse, Color{150, 240, 85, static_cast<unsigned char>(155 * pulse)});
+        }
+        EndBlendMode();
+        break;
+    case Weather::Starlight:
+        BeginBlendMode(BLEND_ADDITIVE);
+        for (int i = 0; i < 44; i += step) {
+            float fi = static_cast<float>(i);
+            float x = std::fmod(fi * 139.0f + std::sin(time * 0.4f + fi) * 22.0f, VIRTUAL_W);
+            float y = std::fmod(fi * 227.0f + time * (12.0f + std::fmod(fi * 3.0f, 12.0f)), WALL_TOP);
+            float tw = 0.4f + 0.6f * std::sin(time * 3.5f + fi * 1.3f);
+            Color sc = (i % 2) ? Color{190, 140, 255, static_cast<unsigned char>(190 * tw)}
+                               : Color{125, 225, 255, static_cast<unsigned char>(175 * tw)};
+            glow(g, {x, y}, 6.0f, sc);
         }
         EndBlendMode();
         break;
@@ -1663,6 +2073,79 @@ void prop_ruin_pillar(const Gfx& g, Vec2 at, Rng& rng, Color stone) {
     }
 }
 
+void prop_oasis_palm(const Gfx& g, Vec2 at, Rng& rng) {
+    // Desert oasis mini-pool + curved palm trunk + layered palm fronds.
+    ellipse(g, at + Vec2{6, 8}, 30, 14, Color{92, 168, 192, 180});
+    ellipse(g, at + Vec2{4, 6}, 22, 9, Color{138, 212, 232, 160});
+    Vec2 top = at + Vec2{rng.uniform(-10, 10), -44};
+    line(at, top, 11, Color{84, 54, 30, 255});
+    line(at, top, 7.5f, Color{136, 94, 52, 255});
+    Color leaf{64, 136, 62, 255};
+    for (int k = 0; k < 6; ++k) {
+        float a = static_cast<float>(k) * (2.0f * PI / 6.0f) + 0.25f;
+        Vec2 tip = top + Vec2{std::cos(a) * 28.0f, std::sin(a) * 18.0f + 5.0f};
+        Vec2 mid = (top + tip) * 0.5f + Vec2{0, -5.0f};
+        line(top, mid, 7.0f, darken(leaf, 0.25f));
+        line(mid, tip, 4.5f, leaf);
+    }
+    disc(g, top + Vec2{-3, 3}, 3.5f, Color{102, 66, 36, 255});
+    disc(g, top + Vec2{4, 4}, 3.5f, Color{102, 66, 36, 255});
+}
+
+void prop_swamp_shroom(const Gfx& g, Vec2 at, Rng& rng) {
+    // Giant bioluminescent swamp mushrooms with glowing emerald caps & spots.
+    int n = rng.range(2, 3);
+    for (int i = 0; i < n; ++i) {
+        Vec2 q = at + Vec2{static_cast<float>(i - 1) * 18.0f, static_cast<float>(i % 2) * 8.0f};
+        float r = i == 1 ? 18.0f : 12.0f;
+        prop_shadow(g, q, r * 1.1f);
+        DrawRectangleRounded({q.x - r * 0.24f, q.y - r * 0.6f, r * 0.48f, r * 1.1f}, 0.5f, 4, Color{168, 194, 148, 255});
+        glow(g, q - Vec2{0, r * 0.55f}, r * 1.6f, Color{125, 240, 85, 85});
+        ellipse(g, q - Vec2{0, r * 0.55f}, r + 2.0f, r * 0.6f + 2.0f, Color{26, 62, 36, 255});
+        ellipse(g, q - Vec2{0, r * 0.55f}, r, r * 0.6f, Color{78, 198, 102, 255});
+        disc(g, q + Vec2{-r * 0.35f, -r * 0.68f}, r * 0.17f, Color{210, 255, 145, 255});
+        disc(g, q + Vec2{r * 0.28f, -r * 0.52f}, r * 0.14f, Color{210, 255, 145, 255});
+    }
+}
+
+void prop_fence(const Gfx& g, Vec2 at, Rng& rng) {
+    float len = rng.uniform(46, 68);
+    Color wood{128, 86, 48, 255};
+    Color dark{68, 42, 22, 255};
+    prop_shadow(g, at, len * 0.5f);
+    line({at.x - len * 0.5f, at.y - 12}, {at.x + len * 0.5f, at.y - 12}, 5.0f, dark);
+    line({at.x - len * 0.5f, at.y - 12}, {at.x + len * 0.5f, at.y - 12}, 3.0f, wood);
+    line({at.x - len * 0.5f, at.y - 4}, {at.x + len * 0.5f, at.y - 4}, 5.0f, dark);
+    line({at.x - len * 0.5f, at.y - 4}, {at.x + len * 0.5f, at.y - 4}, 3.0f, wood);
+    for (int k = -1; k <= 1; ++k) {
+        float x = at.x + static_cast<float>(k) * len * 0.42f;
+        DrawRectangleRec({x - 4, at.y - 18, 8, 22}, dark);
+        DrawRectangleRec({x - 2.5f, at.y - 17, 5, 20}, brighten(wood, 0.1f));
+    }
+}
+
+void prop_crystal_spire(const Gfx& g, Vec2 at, Rng& rng, Color col) {
+    prop_shadow(g, at, 22);
+    glow(g, at - Vec2{0, 14}, 38, with_alpha(col, 0.35f));
+    for (int k = -1; k <= 1; ++k) {
+        float h = (k == 0 ? 44.0f : 28.0f) + rng.uniform(-4, 6);
+        float w = k == 0 ? 11.0f : 8.0f;
+        Vec2 base = at + Vec2{static_cast<float>(k) * 11.0f, static_cast<float>(std::abs(k)) * 4.0f};
+        Vec2 tip = base + Vec2{static_cast<float>(k) * 8.0f, -h};
+        tri(base + Vec2{-w, 0}, base + Vec2{w, 0}, tip, darken(col, 0.45f));
+        tri(base + Vec2{-w * 0.65f, -1}, base + Vec2{w * 0.2f, -1}, tip, col);
+        tri(base + Vec2{w * 0.2f, -1}, base + Vec2{w * 0.7f, -1}, tip, brighten(col, 0.35f));
+    }
+}
+
+void prop_arcane_circle(const Gfx& g, Vec2 at, Rng&) {
+    Color c{170, 125, 255, 115};
+    ring(g, at, 36.0f, c);
+    DrawPolyLinesEx(at.to_raylib(), 6, 32.0f, 0.0f, 1.8f, c);
+    DrawPolyLinesEx(at.to_raylib(), 6, 32.0f, 30.0f, 1.5f, with_alpha(c, 0.7f));
+    disc(g, at, 5.0f, Color{195, 165, 255, 150});
+}
+
 enum class Prop : uint8_t {
     Flowers,
     Mushrooms,
@@ -1675,7 +2158,12 @@ enum class Prop : uint8_t {
     Pond,
     Snowman,
     DeadTree,
-    Vent
+    Vent,
+    OasisPalm,
+    SwampShroom,
+    Fence,
+    CrystalSpire,
+    ArcaneCircle
 };
 
 struct FieldProp {
@@ -1683,35 +2171,56 @@ struct FieldProp {
     Prop kind;
 };
 
-std::vector<FieldProp> field_props(const Theme& th) {
+const std::vector<FieldProp>& field_props(const Theme& th) {
+    static int cached_key = -1;
+    static std::vector<FieldProp> cached;
+    if (cached_key == th.key) return cached;
+    cached_key = th.key;
+    cached.clear();
     Rng rng{static_cast<uint64_t>(th.key * 7919 + 5)};
-    std::vector<FieldProp> out;
-    for (int i = 0; i < 10; ++i) {
-        float x = (i % 2 == 0) ? rng.uniform(50, 230) : rng.uniform(490, 670);
-        Vec2 at{x, rng.uniform(HUD_TOP + 60, WALL_TOP - 90)};
+    for (int i = 0; i < 12; ++i) {
+        float x = (i % 2 == 0) ? rng.uniform(50, 235) : rng.uniform(485, 670);
+        Vec2 at{x, rng.uniform(HUD_TOP + 60, WALL_TOP - 85)};
         int roll = rng.range(0, 99);
         Prop kind;
         switch (th.biome) {
         case 0:
-            kind = roll < 30   ? Prop::Flowers
-                   : roll < 50 ? Prop::Mushrooms
-                   : roll < 70 ? Prop::Log
-                   : roll < 85 ? Prop::Grave
+            kind = roll < 24   ? Prop::Flowers
+                   : roll < 42 ? Prop::Mushrooms
+                   : roll < 60 ? Prop::Log
+                   : roll < 76 ? Prop::Fence
+                   : roll < 88 ? Prop::Grave
                                : Prop::Pillar;
             break;
         case 1:
-            kind = roll < 40 ? Prop::Cactus : roll < 65 ? Prop::Skull : Prop::Pillar;
+            kind = roll < 32   ? Prop::Cactus
+                   : roll < 56 ? Prop::OasisPalm
+                   : roll < 78 ? Prop::Skull
+                               : Prop::Pillar;
             break;
         case 2:
-            kind = roll < 45 ? Prop::Pine : roll < 70 ? Prop::Pond : roll < 82 ? Prop::Snowman : Prop::Pillar;
+            kind = roll < 34   ? Prop::Pine
+                   : roll < 58 ? Prop::Pond
+                   : roll < 76 ? Prop::CrystalSpire
+                   : roll < 88 ? Prop::Snowman
+                               : Prop::Pillar;
+            break;
+        case 3:
+            kind = roll < 32   ? Prop::DeadTree
+                   : roll < 62 ? Prop::Vent
+                   : roll < 82 ? Prop::CrystalSpire
+                               : Prop::Skull;
+            break;
+        case 4:
+            kind = roll < 45 ? Prop::SwampShroom : roll < 74 ? Prop::Log : Prop::DeadTree;
             break;
         default:
-            kind = roll < 40 ? Prop::DeadTree : roll < 70 ? Prop::Vent : Prop::Skull;
+            kind = roll < 40 ? Prop::ArcaneCircle : roll < 76 ? Prop::CrystalSpire : Prop::Pillar;
             break;
         }
-        out.push_back({at, kind});
+        cached.push_back({at, kind});
     }
-    return out;
+    return cached;
 }
 
 void draw_field_prop(Game& game, const Theme& th, const FieldProp& fp, Rng& rng) {
@@ -1755,6 +2264,24 @@ void draw_field_prop(Game& game, const Theme& th, const FieldProp& fp, Rng& rng)
         break;
     case Prop::Vent:
         prop_vent(g, fp.at, rng);
+        break;
+    case Prop::OasisPalm:
+        prop_oasis_palm(g, fp.at, rng);
+        break;
+    case Prop::SwampShroom:
+        prop_swamp_shroom(g, fp.at, rng);
+        break;
+    case Prop::Fence:
+        prop_fence(g, fp.at, rng);
+        break;
+    case Prop::CrystalSpire:
+        prop_crystal_spire(g, fp.at, rng,
+                           th.biome == 3   ? Color{255, 95, 45, 255}
+                           : th.biome == 5 ? Color{178, 125, 255, 255}
+                                           : Color{145, 222, 255, 255});
+        break;
+    case Prop::ArcaneCircle:
+        prop_arcane_circle(g, fp.at, rng);
         break;
     }
 }
@@ -1800,9 +2327,7 @@ void draw_decor(Game& game, const Theme& th, Vec2 at, Rng& rng) {
     }
     case Decor::Crystals: {
         Color cc = th.biome == 3 ? Color{255, 90, 60, 255} : Color{140, 200, 255, 255};
-        BeginBlendMode(BLEND_ADDITIVE);
         glow(g, at, 34, with_alpha(cc, 0.3f));
-        EndBlendMode();
         int n = rng.range(2, 4);
         for (int k = 0; k < n; ++k) {
             float h = rng.uniform(22, 42);
@@ -1826,6 +2351,16 @@ void draw_decor(Game& game, const Theme& th, Vec2 at, Rng& rng) {
         DrawRectangleRec({r.x, r.y, r.width * 0.35f, r.height}, brighten(st, 0.1f));
         ellipse(g, {at.x, r.y}, w / 2, w / 4, brighten(st, 0.2f));
         DrawRectangleLinesEx(r, 2, darken(st, 0.5f));
+        return;
+    }
+    case Decor::Obelisks: {
+        Color ob{54, 48, 86, 255};
+        float w = rng.uniform(16, 24);
+        float h = rng.uniform(36, 62);
+        tri(at + Vec2{-w * 0.6f, 0}, at + Vec2{w * 0.6f, 0}, at + Vec2{0, -h}, darken(ob, 0.45f));
+        tri(at + Vec2{-w * 0.45f, 0}, at + Vec2{w * 0.45f, 0}, at + Vec2{0, -h + 4}, ob);
+        line(at + Vec2{0, -h * 0.72f}, at + Vec2{0, -h * 0.22f}, 2.5f, Color{190, 140, 255, 220});
+        glow(g, at + Vec2{0, -h * 0.5f}, 26.0f, Color{170, 115, 255, 85});
         return;
     }
     case Decor::Rocks:
@@ -1856,7 +2391,8 @@ void build_ground(Game& game, const Theme& th) {
             if (s.use < slot->use) slot = &s;
         }
         if (slot->key == -1) {
-            slot->tex = LoadRenderTexture(VIRTUAL_W, static_cast<int>(WALL_TOP) + 20);
+            // Full VIRTUAL_H height so menu/armory/results backdrops have zero seam below WALL_TOP.
+            slot->tex = LoadRenderTexture(VIRTUAL_W, VIRTUAL_H);
             SetTextureFilter(slot->tex.texture, TEXTURE_FILTER_BILINEAR);
         }
         slot->key = th.key;
@@ -1866,20 +2402,20 @@ void build_ground(Game& game, const Theme& th) {
     Rng rng{static_cast<uint64_t>(th.key * 977 + 13)};
     BeginTextureMode(slot->tex);
     ClearBackground(th.ground);
-    for (int i = 0; i < 120; ++i) {
-        Vec2 p{rng.uniform(-60, VIRTUAL_W + 60), rng.uniform(-60, WALL_TOP + 60)};
+    for (int i = 0; i < 140; ++i) {
+        Vec2 p{rng.uniform(-60, VIRTUAL_W + 60), rng.uniform(-60, VIRTUAL_H + 60)};
         float r = rng.uniform(60, 170);
         Color c = rng.chance(0.5f) ? th.dark : th.light;
         glow(g, p, r, with_alpha(c, rng.uniform(0.35f, 0.7f)));
     }
-    for (int i = 0; i < 26; ++i) {
-        Vec2 p{rng.uniform(0, VIRTUAL_W), rng.uniform(HUD_TOP, WALL_TOP - 30)};
+    for (int i = 0; i < 32; ++i) {
+        Vec2 p{rng.uniform(0, VIRTUAL_W), rng.uniform(HUD_TOP, VIRTUAL_H - 30)};
         float r = rng.uniform(16, 40);
         ellipse(g, p, r, r * 0.55f, with_alpha(darken(th.dark, 0.15f), 0.35f));
         ellipse(g, p - Vec2{0, r * 0.08f}, r * 0.8f, r * 0.42f, with_alpha(th.dark, 0.5f));
     }
-    for (int i = 0; i < 500; ++i) {
-        Vec2 p{rng.uniform(0, VIRTUAL_W), rng.uniform(0, WALL_TOP)};
+    for (int i = 0; i < 600; ++i) {
+        Vec2 p{rng.uniform(0, VIRTUAL_W), rng.uniform(0, VIRTUAL_H)};
         Color c = darken(th.dark, rng.uniform(0.0f, 0.25f));
         if (th.biome == 0) {
             line(p, p + Vec2{rng.uniform(-3, 3), -rng.uniform(5, 10)}, 2.0f, c);
@@ -1897,7 +2433,62 @@ void build_ground(Game& game, const Theme& th) {
             ellipse(g, p - Vec2{rx * 0.3f, rx * 0.1f}, rx * 0.4f, rx * 0.1f, Color{220, 230, 255, 120});
         }
     }
-    if (th.biome == 3) {
+    if (th.biome == 0) {
+        // Seamless winding dirt & cobblestone road built from quad strips (zero seam arcs!).
+        Color road_edge = mix(th.ground, Color{118, 98, 68, 255}, 0.52f);
+        Color road_fill = mix(th.ground, Color{154, 134, 98, 255}, 0.65f);
+        Color road_mid = mix(th.ground, Color{174, 154, 118, 255}, 0.70f);
+        auto road_x = [&](float y) {
+            return VIRTUAL_W * 0.5f + std::sin(y * 0.0075f + static_cast<float>(th.key)) * 44.0f;
+        };
+        auto draw_ribbon = [&](float half_w, Color col) {
+            constexpr float STEP = 16.0f;
+            for (float y = -STEP; y < VIRTUAL_H + STEP; y += STEP) {
+                float x0 = road_x(y);
+                float x1 = road_x(y + STEP);
+                Vec2 tl{x0 - half_w, y};
+                Vec2 tr{x0 + half_w, y};
+                Vec2 bl{x1 - half_w, y + STEP};
+                Vec2 br{x1 + half_w, y + STEP};
+                tri(tl, tr, br, col);
+                tri(tl, br, bl, col);
+            }
+        };
+        draw_ribbon(68.0f, road_edge);
+        draw_ribbon(58.0f, road_fill);
+        draw_ribbon(30.0f, road_mid);
+        // Distinct scattered cobblestones along the road.
+        for (int i = 0; i < 65; ++i) {
+            float y = rng.uniform(HUD_TOP, VIRTUAL_H - 20.0f);
+            float cx = road_x(y) + rng.uniform(-50.0f, 50.0f);
+            float rw = rng.uniform(7.0f, 13.0f);
+            float rh = rw * rng.uniform(0.55f, 0.75f);
+            Color stone_c = rng.chance(0.5f) ? darken(road_fill, 0.16f) : brighten(road_mid, 0.12f);
+            ellipse(g, {cx, y}, rw, rh, with_alpha(stone_c, 0.65f));
+        }
+    } else if (th.biome == 1) {
+        // Sweeping wind-carved sand dune ridges.
+        for (float y = HUD_TOP + 30.0f; y < VIRTUAL_H - 20.0f; y += 110.0f) {
+            for (float x = 0.0f; x < VIRTUAL_W; x += 28.0f) {
+                float dy = std::sin(x * 0.014f + y * 0.02f) * 16.0f;
+                line({x, y + dy}, {x + 28.0f, y + std::sin((x + 28.0f) * 0.014f + y * 0.02f) * 16.0f}, 6.0f,
+                     with_alpha(th.dark, 0.35f));
+                line({x, y + dy - 4.0f}, {x + 28.0f, y + std::sin((x + 28.0f) * 0.014f + y * 0.02f) * 16.0f - 4.0f},
+                     3.0f, with_alpha(th.light, 0.45f));
+            }
+        }
+    } else if (th.biome == 2) {
+        // Glacial ice fissures across the frozen tundra.
+        for (int i = 0; i < 7; ++i) {
+            Vec2 p{rng.uniform(50, VIRTUAL_W - 50), rng.uniform(HUD_TOP + 40, VIRTUAL_H - 60)};
+            for (int sgm = 0; sgm < 4; ++sgm) {
+                Vec2 q = p + Vec2{rng.uniform(-45, 45), rng.uniform(-25, 35)};
+                line(p, q, 4.0f, Color{130, 178, 218, 120});
+                line(p, q, 1.5f, Color{240, 250, 255, 190});
+                p = q;
+            }
+        }
+    } else if (th.biome == 3) {
         for (int i = 0; i < 4; ++i) {
             Vec2 p{rng.uniform(60, VIRTUAL_W - 60), rng.uniform(HUD_TOP + 80, WALL_TOP - 120)};
             float rx = rng.uniform(34, 64);
@@ -1906,13 +2497,39 @@ void build_ground(Game& game, const Theme& th) {
             ellipse(g, p, rx * 0.6f, rx * 0.28f, Color{255, 170, 60, 255});
             glow(g, p, rx * 1.4f, Color{255, 120, 40, 90});
         }
-        for (int i = 0; i < 7; ++i) {
-            Vec2 p{rng.uniform(40, VIRTUAL_W - 40), rng.uniform(HUD_TOP + 40, WALL_TOP - 60)};
+        for (int i = 0; i < 8; ++i) {
+            Vec2 p{rng.uniform(40, VIRTUAL_W - 40), rng.uniform(HUD_TOP + 40, VIRTUAL_H - 60)};
             for (int sgm = 0; sgm < 5; ++sgm) {
                 Vec2 q = p + Vec2{rng.uniform(-40, 40), rng.uniform(-30, 30)};
                 line(p, q, 6.0f, Color{60, 20, 10, 200});
                 line(p, q, 2.5f, Color{255, 110, 40, 220});
                 p = q;
+            }
+        }
+    } else if (th.biome == 4) {
+        // Blighted Mire: murky glowing bog water pools & lily pads.
+        for (int i = 0; i < 7; ++i) {
+            Vec2 p{rng.uniform(60, VIRTUAL_W - 60), rng.uniform(HUD_TOP + 70, VIRTUAL_H - 100)};
+            float rx = rng.uniform(38, 72);
+            ellipse(g, p, rx + 6, rx * 0.45f + 5, Color{34, 48, 36, 220});
+            ellipse(g, p, rx, rx * 0.45f, Color{62, 108, 66, 210});
+            ellipse(g, p, rx * 0.65f, rx * 0.26f, Color{118, 192, 74, 130});
+            disc(g, p + Vec2{rx * 0.25f, -rx * 0.1f}, 8.0f, Color{70, 140, 62, 230});
+        }
+    } else if (th.biome == 5) {
+        // Astral Citadel: geometric obsidian flagstones & subtle etched arcane inlays.
+        Color seam = darken(th.dark, 0.28f);
+        for (float y = HUD_TOP; y < VIRTUAL_H; y += 64.0f) {
+            line({0, y}, {VIRTUAL_W, y}, 1.5f, with_alpha(seam, 0.55f));
+            for (float x = (static_cast<int>(y / 64) % 2) * 48.0f; x < VIRTUAL_W; x += 96.0f) {
+                line({x, y}, {x, y + 64.0f}, 1.5f, with_alpha(seam, 0.55f));
+            }
+        }
+        // Subtle dashed runic channels & glowing diamond nodes along the flagstones.
+        for (float x : {144.0f, 360.0f, 576.0f}) {
+            for (float y = HUD_TOP + 32.0f; y < VIRTUAL_H - 32.0f; y += 128.0f) {
+                line({x, y}, {x, y + 64.0f}, 2.0f, Color{155, 115, 240, 42});
+                DrawPoly({x, y + 32.0f}, 4, 6.0f, 0, Color{170, 130, 250, 58});
             }
         }
     }
@@ -1983,27 +2600,14 @@ void draw_live_env(Game& game, const Theme& th, float time) {
             glow(g, {x + 120.0f, y + 30.0f}, 180.0f, Color{0, 0, 0, 28});
         }
     }
-    for (const auto& fp : field_props(th)) {
+    const auto& props = field_props(th);
+    for (const auto& fp : props) {
         if (fp.kind == Prop::Vent) {
             for (int k = 0; k < 5; ++k) {
                 float ph = std::fmod(time * 0.45f + static_cast<float>(k) * 0.2f + fp.at.x * 0.001f, 1.0f);
                 Vec2 q = fp.at + Vec2{std::sin(ph * 6.0f + static_cast<float>(k)) * 8.0f, -ph * 120.0f};
                 disc(g, q, 8.0f + ph * 26.0f, Color{70, 64, 62, static_cast<unsigned char>(130 * (1.0f - ph))});
             }
-            BeginBlendMode(BLEND_ADDITIVE);
-            glow(g, fp.at, 22.0f + 4.0f * std::sin(time * 5.0f + fp.at.x), Color{255, 110, 40, 150});
-            EndBlendMode();
-        } else if (fp.kind == Prop::Pond) {
-            BeginBlendMode(BLEND_ADDITIVE);
-            for (int k = 0; k < 3; ++k) {
-                float tw = std::max(0.0f, std::sin(time * 2.3f + static_cast<float>(k) * 2.1f + fp.at.y));
-                Vec2 q = fp.at + Vec2{static_cast<float>(k - 1) * 22.0f, static_cast<float>(k % 2) * 6.0f - 4.0f};
-                line(q - Vec2{6 * tw, 0}, q + Vec2{6 * tw, 0}, 1.5f,
-                     Color{255, 255, 255, static_cast<unsigned char>(220 * tw)});
-                line(q - Vec2{0, 6 * tw}, q + Vec2{0, 6 * tw}, 1.5f,
-                     Color{255, 255, 255, static_cast<unsigned char>(220 * tw)});
-            }
-            EndBlendMode();
         } else if (fp.kind == Prop::Flowers && th.night <= 0.0f) {
             float a = time * 1.6f + fp.at.x;
             Vec2 q = fp.at + Vec2{std::cos(a) * 26.0f, std::sin(a * 1.3f) * 14.0f - 18.0f};
@@ -2012,13 +2616,45 @@ void draw_live_env(Game& game, const Theme& th, float time) {
             ellipse(g, q + Vec2{3 * flap, 0}, 3.0f * flap + 0.5f, 3.0f, Color{255, 170, 60, 230});
         }
     }
-    if (th.biome == 3) {
-        Rng lava{static_cast<uint64_t>(th.key * 13 + 1)};
+    // Single batched additive pass for vents, pond glints, swamp shroom glow, lava shimmer, and aurora curtains!
+    if (th.biome == 2 || th.biome == 3 || th.biome == 4 || th.biome == 5) {
         BeginBlendMode(BLEND_ADDITIVE);
-        for (int i = 0; i < 6; ++i) {
-            Vec2 p{lava.uniform(40, VIRTUAL_W - 40), lava.uniform(HUD_TOP + 40, WALL_TOP - 60)};
-            float k = 0.5f + 0.5f * std::sin(time * 1.8f + static_cast<float>(i) * 1.3f);
-            glow(g, p, 50.0f + 20.0f * k, Color{255, 90, 30, static_cast<unsigned char>(30 + 50 * k)});
+        for (const auto& fp : props) {
+            if (fp.kind == Prop::Vent) {
+                glow(g, fp.at, 22.0f + 4.0f * std::sin(time * 5.0f + fp.at.x), Color{255, 110, 40, 150});
+            } else if (fp.kind == Prop::Pond) {
+                for (int k = 0; k < 3; ++k) {
+                    float tw = std::max(0.0f, std::sin(time * 2.3f + static_cast<float>(k) * 2.1f + fp.at.y));
+                    Vec2 q = fp.at + Vec2{static_cast<float>(k - 1) * 22.0f, static_cast<float>(k % 2) * 6.0f - 4.0f};
+                    line(q - Vec2{6 * tw, 0}, q + Vec2{6 * tw, 0}, 1.5f,
+                         Color{255, 255, 255, static_cast<unsigned char>(220 * tw)});
+                    line(q - Vec2{0, 6 * tw}, q + Vec2{0, 6 * tw}, 1.5f,
+                         Color{255, 255, 255, static_cast<unsigned char>(220 * tw)});
+                }
+            } else if (fp.kind == Prop::SwampShroom) {
+                float p = 0.55f + 0.45f * std::sin(time * 2.6f + fp.at.x);
+                glow(g, fp.at - Vec2{0, 8}, 28.0f * p + 12.0f, Color{125, 245, 90, static_cast<unsigned char>(75 * p)});
+            } else if (fp.kind == Prop::ArcaneCircle) {
+                float p = 0.5f + 0.5f * std::sin(time * 3.0f + fp.at.y);
+                glow(g, fp.at, 44.0f, Color{175, 120, 255, static_cast<unsigned char>(65 * p)});
+            }
+        }
+        if (th.biome == 3) {
+            Rng lava{static_cast<uint64_t>(th.key * 13 + 1)};
+            for (int i = 0; i < 6; ++i) {
+                Vec2 p{lava.uniform(40, VIRTUAL_W - 40), lava.uniform(HUD_TOP + 40, WALL_TOP - 60)};
+                float k = 0.5f + 0.5f * std::sin(time * 1.8f + static_cast<float>(i) * 1.3f);
+                glow(g, p, 50.0f + 20.0f * k, Color{255, 90, 30, static_cast<unsigned char>(30 + 50 * k)});
+            }
+        }
+        if (th.biome == 2 || th.biome == 5) {
+            Color ac = th.biome == 2 ? Color{110, 235, 220, 32} : Color{175, 115, 255, 42};
+            for (int i = 0; i < 4; ++i) {
+                float fi = static_cast<float>(i);
+                float x = VIRTUAL_W * (0.15f + 0.24f * fi) + std::sin(time * 0.5f + fi * 1.7f) * 50.0f;
+                float y = HUD_TOP + 45.0f + std::cos(time * 0.35f + fi) * 20.0f;
+                glow(g, {x, y}, 170.0f, ac);
+            }
         }
         EndBlendMode();
     }
@@ -2148,16 +2784,160 @@ void draw_boss_death(Game& game, const Run& run, const BossDeath& b) {
     EndBlendMode();
 }
 
+void draw_stage_zones(Game& game, const Run& run) {
+    if (run.zones.empty()) return;
+    const auto& g = game.gfx;
+    // Pass 1: alpha ground bases & rings.
+    for (const auto& z : run.zones) {
+        if (!z.active) continue;
+        float t = game.time + z.seed;
+        switch (z.kind) {
+        case ZoneKind::IceSlick:
+            ellipse(g, z.pos, z.radius, z.radius * 0.72f, Color{135, 215, 252, 95});
+            ellipse(g, z.pos - Vec2{z.radius * 0.12f, z.radius * 0.08f}, z.radius * 0.65f, z.radius * 0.42f,
+                    Color{225, 248, 255, 105});
+            DrawEllipseLines(static_cast<int>(z.pos.x), static_cast<int>(z.pos.y), z.radius, z.radius * 0.72f,
+                             Color{205, 242, 255, 185});
+            break;
+        case ZoneKind::LavaFissure:
+            ellipse(g, z.pos, z.radius * 0.75f, z.radius * 0.52f, Color{38, 18, 16, 180});
+            ellipse(g, z.pos, z.radius * 0.58f, z.radius * 0.38f,
+                    Color{235, static_cast<unsigned char>(85 + 75 * z.charge), 24, 200});
+            if (z.charge > 0.02f) {
+                DrawCircleLinesV(z.pos.to_raylib(), z.radius * 1.45f,
+                                 Color{255, 175, 65, static_cast<unsigned char>(180 * z.charge)});
+                ring(g, z.pos, z.radius * 1.45f * z.charge, Color{255, 220, 120, 210});
+            }
+            break;
+        case ZoneKind::SporeCloud: {
+            float fade = z.max_life > 0.0f ? std::min(1.0f, z.timer / 1.2f) : 1.0f;
+            float pulse = 0.8f + 0.2f * std::sin(t * 3.0f);
+            DrawCircleLinesV(z.pos.to_raylib(), z.radius * pulse,
+                             Color{165, 245, 90, static_cast<unsigned char>(130 * fade)});
+            for (int k = 0; k < 4; ++k) {
+                float a = t * 0.9f + static_cast<float>(k) * 1.57f;
+                Vec2 bp = z.pos + Vec2{std::cos(a), std::sin(a)} * (z.radius * 0.45f);
+                disc(g, bp, 7.0f + 2.0f * std::sin(t * 4.0f + k),
+                     Color{180, 255, 110, static_cast<unsigned char>(135 * fade)});
+            }
+            break;
+        }
+        case ZoneKind::Leyline: {
+            float rot = t * 28.0f;
+            float pulse = 0.65f + 0.35f * std::sin(t * 3.5f);
+            DrawPolyLinesEx(z.pos.to_raylib(), 6, z.radius, rot, 2.5f, Color{190, 140, 255, 180});
+            DrawPolyLinesEx(z.pos.to_raylib(), 6, z.radius * 0.62f, -rot * 1.4f, 2.0f, Color{130, 230, 255, 190});
+            text(g, "+35%", z.pos, 18, Color{220, 190, 255, static_cast<unsigned char>(190 * pulse)}, Align::Center,
+                 false);
+            break;
+        }
+        case ZoneKind::Vortex: {
+            float fade = std::min(1.0f, z.timer / 0.6f);
+            disc(g, z.pos, z.radius * 0.65f, Color{24, 12, 42, static_cast<unsigned char>(190 * fade)});
+            for (int r = 0; r < 3; ++r) {
+                float ph = std::fmod(t * 1.5f + static_cast<float>(r) * 0.33f, 1.0f);
+                DrawCircleLinesV(z.pos.to_raylib(), z.radius * (1.0f - ph * 0.7f),
+                                 Color{205, 140, 255, static_cast<unsigned char>(210 * (1.0f - ph) * fade)});
+            }
+            break;
+        }
+        case ZoneKind::NapalmPool:
+            break;
+        }
+    }
+    // Pass 2: single batched additive glow pass for all zones!
+    BeginBlendMode(BLEND_ADDITIVE);
+    for (const auto& z : run.zones) {
+        if (!z.active) continue;
+        float t = game.time + z.seed;
+        switch (z.kind) {
+        case ZoneKind::LavaFissure: {
+            float pulse = 0.55f + 0.45f * std::sin(t * 4.0f);
+            if (z.charge > 0.02f) {
+                glow(g, z.pos, z.radius * (1.1f + 0.6f * z.charge),
+                     Color{255, 130, 40, static_cast<unsigned char>(110 + 110 * z.charge)});
+            } else {
+                glow(g, z.pos, z.radius * 0.9f, Color{255, 95, 30, static_cast<unsigned char>(60 * pulse)});
+            }
+            break;
+        }
+        case ZoneKind::SporeCloud: {
+            float fade = z.max_life > 0.0f ? std::min(1.0f, z.timer / 1.2f) : 1.0f;
+            float pulse = 0.8f + 0.2f * std::sin(t * 3.0f);
+            glow(g, z.pos, z.radius * 1.25f * pulse, Color{135, 235, 70, static_cast<unsigned char>(80 * fade)});
+            break;
+        }
+        case ZoneKind::Leyline: {
+            float pulse = 0.65f + 0.35f * std::sin(t * 3.5f);
+            glow(g, z.pos, z.radius * 1.35f, Color{170, 115, 255, static_cast<unsigned char>(85 * pulse)});
+            break;
+        }
+        case ZoneKind::NapalmPool: {
+            float fade = std::min(1.0f, z.timer / 1.0f);
+            glow(g, z.pos, z.radius * 1.3f, Color{255, 90, 150, static_cast<unsigned char>(115 * fade)});
+            glow(g, z.pos, z.radius * 0.75f, Color{255, 185, 70, static_cast<unsigned char>(150 * fade)});
+            break;
+        }
+        case ZoneKind::Vortex: {
+            float fade = std::min(1.0f, z.timer / 0.6f);
+            glow(g, z.pos, z.radius * 1.3f, Color{165, 80, 255, static_cast<unsigned char>(140 * fade)});
+            break;
+        }
+        case ZoneKind::IceSlick:
+            break;
+        }
+    }
+    EndBlendMode();
+}
+
 void draw_shells(Game& game, const Run& run) {
     const auto& g = game.gfx;
     for (const auto& s : run.shells) {
+        if (s.missile) {
+            Vec2 dir = s.vel.length_sq() > 1.0f ? s.vel.normalized() : Vec2{0, -1};
+            Vec2 perp{-dir.y, dir.x};
+            ellipse(g, s.pos + Vec2{0, 14}, 7, 3, Color{0, 0, 0, 55});
+            // Thruster flame + white rocket fuselage + red warhead nose!
+            glow(g, s.pos - dir * 10.0f, 14.0f, Color{255, 145, 50, 210});
+            tri(s.pos - dir * 15.0f, s.pos - dir * 6.0f + perp * 4.0f, s.pos - dir * 6.0f - perp * 4.0f,
+                Color{255, 210, 80, 240});
+            line(s.pos - dir * 7.0f, s.pos + dir * 6.0f, 7.2f, Color{26, 26, 32, 255});
+            line(s.pos - dir * 6.5f, s.pos + dir * 5.0f, 4.8f, Color{235, 238, 245, 255});
+            tri(s.pos + dir * 11.0f, s.pos + dir * 3.5f + perp * 3.8f, s.pos + dir * 3.5f - perp * 3.8f,
+                Color{255, 72, 52, 255});
+            continue;
+        }
         float k = s.t / s.duration;
         Vec2 ground = s.from + (s.to - s.from) * k;
         if (s.bomb) {
-            float h = (1.0f - k) * 200.0f;
-            ellipse(g, s.to, 14 * k + 4, 6 * k + 2, Color{0, 0, 0, 90});
-            disc(g, ground + Vec2{0, -h * 0.1f}, 9, Color{40, 40, 44, 255});
-            ring(g, s.to, s.radius * (0.3f + 0.7f * k), Color{255, 60, 40, static_cast<unsigned char>(160 * k)});
+            float h = (1.0f - k) * 230.0f;
+            Vec2 bpos = ground + Vec2{0, -h * 0.18f};
+            Color rc = s.napalm ? Color{255, 95, 190, 255} : Color{255, 85, 50, 255};
+            // Ground tactical crosshair target reticle + shrinking lock ring!
+            float tr = s.radius * (0.28f + 0.72f * k);
+            DrawCircleV(s.to.to_raylib(), tr, with_alpha(rc, 0.10f + 0.12f * k));
+            ring(g, s.to, tr, with_alpha(rc, 0.45f + 0.45f * k));
+            ring(g, s.to, s.radius * (1.0f - k * 0.75f), with_alpha(Color{255, 235, 130, 255}, 0.75f * k));
+            float tk = 10.0f + 8.0f * (1.0f - k);
+            line(s.to + Vec2{-tk, 0}, s.to + Vec2{-4, 0}, 2.0f, with_alpha(rc, 0.85f));
+            line(s.to + Vec2{4, 0}, s.to + Vec2{tk, 0}, 2.0f, with_alpha(rc, 0.85f));
+            line(s.to + Vec2{0, -tk}, s.to + Vec2{0, -4}, 2.0f, with_alpha(rc, 0.85f));
+            line(s.to + Vec2{0, 4}, s.to + Vec2{0, tk}, 2.0f, with_alpha(rc, 0.85f));
+            ellipse(g, s.to, 16 * k + 5, 7 * k + 2, Color{0, 0, 0, 95});
+            // Sleek finned aerial bomb dropping steeply toward target!
+            Vec2 bdir = (s.to - s.from).normalized();
+            Vec2 bperp{-bdir.y, bdir.x};
+            glow(g, bpos - bdir * 11.0f, 13.0f, with_alpha(rc, 0.75f));
+            tri(bpos - bdir * 14.0f + bperp * 6.5f, bpos - bdir * 14.0f - bperp * 6.5f, bpos - bdir * 4.0f,
+                s.napalm ? Color{255, 120, 200, 255} : Color{210, 60, 45, 255});
+            line(bpos - bdir * 10.0f, bpos + bdir * 7.0f, 11.0f, Color{24, 24, 30, 255});
+            line(bpos - bdir * 9.0f, bpos + bdir * 6.0f, 8.0f, s.napalm ? Color{195, 58, 135, 255} : Color{68, 72, 82, 255});
+            disc(g, bpos + bdir * 8.0f, 4.2f, Color{255, 210, 85, 255});
+        } else if (s.frost) {
+            float h = std::sin(k * PI) * 110.0f;
+            ellipse(g, ground, 8, 4, Color{0, 0, 0, 70});
+            DrawPoly((ground + Vec2{0, -h}).to_raylib(), 6, 9, k * 360.0f, Color{140, 232, 255, 255});
+            disc(g, ground + Vec2{0, -h}, 4.5f, WHITE);
         } else if (s.grenade) {
             float h = std::sin(k * PI) * 90.0f;
             ellipse(g, ground, 6, 3, Color{0, 0, 0, 70});
@@ -2189,15 +2969,50 @@ void draw_projectiles(Game& game, const Run& run) {
             glow(g, bl.pos, sz * 0.4f, Color{255, 250, 210, static_cast<unsigned char>(200 * a * (1.0f - k))});
             continue;
         }
-        Color core = bl.crit ? Color{255, 150, 60, 255} : Color{255, 226, 120, 255};
-        if (bl.shard) core = Color{170, 230, 255, 255};
-        float len = bl.unit == UnitType::Sniper ? 56.0f : bl.crit ? 34.0f : 26.0f;
-        float w = bl.unit == UnitType::Sniper ? 3.2f : bl.crit ? 3.0f : 2.4f;
+        if (bl.cryo) {
+            Vec2 tail = bl.pos - dir * 38.0f;
+            Vec2 perp{-dir.y, dir.x};
+            line(tail, bl.pos, 4.6f, Color{100, 220, 255, 165});
+            line(bl.pos - dir * 20.0f, bl.pos, 2.4f, Color{235, 252, 255, 245});
+            tri(bl.pos + dir * 8.0f, bl.pos - dir * 5.0f + perp * 4.2f, bl.pos - dir * 5.0f - perp * 4.2f,
+                Color{195, 245, 255, 245});
+            glow(g, bl.pos, 17.0f, Color{120, 230, 255, 185});
+            continue;
+        }
+        if (bl.volt) {
+            Vec2 perp{-dir.y, dir.x};
+            float zig = std::sin(game.time * 55.0f + bl.pos.y * 0.08f) * 4.5f;
+            Vec2 tail = bl.pos - dir * 28.0f;
+            Vec2 mid = bl.pos - dir * 14.0f + perp * zig;
+            line(tail, mid, 4.4f, Color{175, 115, 255, 195});
+            line(mid, bl.pos, 4.4f, Color{175, 115, 255, 215});
+            line(tail, mid, 1.8f, WHITE);
+            line(mid, bl.pos, 1.8f, WHITE);
+            glow(g, bl.pos, 19.0f, Color{185, 130, 255, 230});
+            disc(g, bl.pos, 4.8f, Color{240, 228, 255, 255});
+            continue;
+        }
+        Color core = bl.shard          ? Color{170, 230, 255, 255}
+                     : bl.phantom      ? Color{185, 140, 255, 255}
+                     : bl.supercharged ? Color{210, 145, 255, 255}
+                     : bl.crit         ? Color{255, 155, 50, 255}
+                     : bl.armor_pierce ? Color{255, 250, 185, 255}
+                                       : unit_def(bl.unit).tracer;
+        float len = bl.unit == UnitType::Sniper ? 78.0f : bl.unit == UnitType::Shotgunner ? 26.0f : bl.crit ? 44.0f : 30.0f;
+        float w = bl.unit == UnitType::Sniper ? 4.2f : bl.unit == UnitType::Shotgunner ? 3.5f : bl.crit ? 3.4f : 2.6f;
         Vec2 tail = bl.pos - dir * len;
-        line(tail, bl.pos - dir * len * 0.45f, w * 0.7f, with_alpha(core, 0.25f));
-        line(bl.pos - dir * len * 0.5f, bl.pos, w * 1.4f, with_alpha(core, 0.6f));
-        line(bl.pos - dir * len * 0.3f, bl.pos, w * 0.6f, WHITE);
-        glow(g, bl.pos, w * 4.0f, with_alpha(core, 0.85f));
+        line(tail, bl.pos - dir * len * 0.42f, w * 0.8f, with_alpha(core, 0.32f));
+        line(bl.pos - dir * len * 0.52f, bl.pos, w * 1.55f, with_alpha(core, 0.72f));
+        line(bl.pos - dir * len * 0.32f, bl.pos, w * 0.7f, WHITE);
+        glow(g, bl.pos, w * (bl.crit ? 5.2f : 4.4f), with_alpha(core, 0.90f));
+        if (bl.crit) {
+            Vec2 perp{-dir.y, dir.x};
+            line(bl.pos - perp * 7.5f, bl.pos + perp * 7.5f, 2.0f, Color{255, 245, 185, 220});
+        }
+        if (bl.unit == UnitType::Sniper) {
+            ring(g, bl.pos - dir * 24.0f, 9.5f, with_alpha(core, 0.55f));
+            ring(g, bl.pos - dir * 48.0f, 6.0f, with_alpha(core, 0.30f));
+        }
     }
     for (const auto& bolt : run.bolts) {
         float a = bolt.life / bolt.max_life;
@@ -2225,11 +3040,93 @@ void render_world(Game& game) {
     begin_camera(cam);
 
     draw_backdrop(game, run.theme, game.time);
+    draw_stage_zones(game, run);
+
+    // Tactical carpet-bombing corridor while Airstrike V-Squadron is sweeping overhead!
+    if (run.plane_t >= 0.0f) {
+        float fade = run.plane_t < 0.15f   ? run.plane_t / 0.15f
+                     : run.plane_t > 1.15f ? std::max(0.0f, (1.38f - run.plane_t) / 0.23f)
+                                           : 1.0f;
+        Color lc = run.stats.orbital_strike ? Color{255, 95, 195, 255} : Color{255, 90, 50, 255};
+        float lane_y = run.plane_y - 84.0f;
+        DrawRectangleRec({0, lane_y, VIRTUAL_W, 168.0f}, with_alpha(lc, 0.12f * fade));
+        line({0, lane_y}, {VIRTUAL_W, lane_y}, 3.0f, with_alpha(lc, 0.68f * fade));
+        line({0, lane_y + 168.0f}, {VIRTUAL_W, lane_y + 168.0f}, 3.0f, with_alpha(lc, 0.68f * fade));
+        float scroll = std::fmod(game.time * 240.0f, 72.0f);
+        for (float cx = scroll - 72.0f; cx < VIRTUAL_W + 40.0f; cx += 72.0f) {
+            line({cx, run.plane_y - 26.0f}, {cx + 22.0f, run.plane_y}, 3.5f, with_alpha(lc, 0.42f * fade));
+            line({cx + 22.0f, run.plane_y}, {cx, run.plane_y + 26.0f}, 3.5f, with_alpha(lc, 0.42f * fade));
+        }
+    }
+
+    // Sandstorm wind gust streaks!
+    if (run.wind_timer > 0.0f) {
+        float dir = run.wind_force > 0.0f ? 1.0f : -1.0f;
+        for (int i = 0; i < 28; ++i) {
+            float fi = static_cast<float>(i);
+            float x = std::fmod(fi * 97.0f + game.time * 420.0f * dir + VIRTUAL_W * 4.0f, VIRTUAL_W + 120.0f) - 60.0f;
+            float y = HUD_TOP + std::fmod(fi * 173.0f, WALL_TOP - HUD_TOP);
+            line({x, y}, {x + dir * 75.0f, y + 8.0f}, 2.2f, Color{245, 215, 155, 115});
+        }
+    }
+
+    // Boss attack telegraphs on the ground before impact.
+    for (const auto& e : run.enemies) {
+        if (e.dead || e.type != EnemyType::Boss || e.telegraph_t <= 0.0f) continue;
+        float flash = 0.5f + 0.5f * std::sin(game.time * 24.0f);
+        if (e.telegraph_kind == 1) {
+            Rectangle lane{e.pos.x - e.radius * 0.9f, e.pos.y, e.radius * 1.8f, WALL_TOP - e.pos.y};
+            DrawRectangleRec(lane, Color{255, 60, 40, static_cast<unsigned char>(35 + 40 * flash)});
+            DrawRectangleLinesEx(lane, 3.0f, Color{255, 110, 70, static_cast<unsigned char>(150 + 80 * flash)});
+        } else if (e.telegraph_kind == 2) {
+            ring(g, e.pos, e.radius * (1.2f + 1.0f * (1.0f - e.telegraph_t / 0.8f)),
+                 Color{255, 200, 70, static_cast<unsigned char>(180 * flash)});
+        } else if (e.telegraph_kind == 3) {
+            line(e.pos, {e.pos.x, WALL_TOP}, 3.5f, Color{255, 80, 170, static_cast<unsigned char>(170 + 70 * flash)});
+        }
+    }
+
+    // Warlord tactical 190px ground aura rings drawn cleanly beneath all enemies.
+    for (const auto& e : run.enemies) {
+        if (e.dead || e.type != EnemyType::Warlord || e.freeze_timer > 0.0f) continue;
+        float pulse = 0.65f + 0.35f * std::sin(game.time * 5.0f);
+        DrawCircleLinesV(e.pos.to_raylib(), 190.0f, Color{255, 180, 65, static_cast<unsigned char>(65 * pulse)});
+    }
+
+    // Active boss seismic waves and sweeping eye beams in a single batched additive pass.
+    if (!run.boss_waves.empty() || !run.boss_beams.empty()) {
+        BeginBlendMode(BLEND_ADDITIVE);
+        for (const auto& w : run.boss_waves) {
+            ellipse(g, w.pos, w.width * 0.65f, 22.0f, with_alpha(w.color, 0.55f));
+            line({w.pos.x - w.width * 0.5f, w.pos.y}, {w.pos.x + w.width * 0.5f, w.pos.y}, 8.0f, WHITE);
+        }
+        for (const auto& b : run.boss_beams) {
+            float dy = WALL_TOP - b.origin.y;
+            float hit_x = b.origin.x + dy / std::max(0.12f, std::tan(b.angle));
+            line(b.origin, {hit_x, WALL_TOP}, 28.0f, with_alpha(b.color, 0.4f));
+            line(b.origin, {hit_x, WALL_TOP}, 12.0f, with_alpha(b.color, 0.85f));
+            line(b.origin, {hit_x, WALL_TOP}, 5.0f, WHITE);
+            glow(g, {hit_x, WALL_TOP}, 36.0f, with_alpha(b.color, 0.85f));
+        }
+        EndBlendMode();
+    }
 
     draw_shells(game, run);
+    // Giant spinning, laughing Dad Salama heads arcing across the battlefield!
+    for (const auto& h : run.salama_heads) {
+        if (h.t < 0.0f) continue;
+        float k = std::clamp(h.t / h.duration, 0.0f, 1.0f);
+        Vec2 ground = h.from + (h.to - h.from) * k;
+        float arc = std::sin(k * PI) * (h.bounces > 0 ? 155.0f : 95.0f);
+        float puff = k > 0.75f ? (k - 0.75f) / 0.25f : 0.0f;
+        ellipse(g, ground, 22.0f + 14.0f * k, 8.0f + 5.0f * k, Color{0, 0, 0, 95});
+        ring(g, h.to, h.radius * (0.25f + 0.75f * k), Color{255, 215, 65, static_cast<unsigned char>(175 * k)});
+        draw_salama_head(g, ground + Vec2{0, -arc}, 34.0f + 10.0f * std::sin(k * PI), h.rot, game.time, puff);
+    }
 
-    std::vector<const Enemy*> order;
-    order.reserve(run.enemies.size());
+    static std::vector<const Enemy*> order;
+    order.clear();
+    if (order.capacity() < run.enemies.size()) order.reserve(run.enemies.size());
     for (const auto& e : run.enemies) {
         if (!e.dead) order.push_back(&e);
     }
@@ -2238,7 +3135,7 @@ void render_world(Game& game) {
         if (e->type == EnemyType::Boss) {
             const BossGenome& gen = e->mini_boss ? run.mini_boss : run.boss;
             draw_boss(g, gen, run.theme.biome, e->pos, e->radius, e->anim, e->flash, e->enraged, game.time,
-                      e->shield_max > 0.0f ? std::max(0.0f, e->shield_hp / e->shield_max) : 0.0f);
+                      e->shield_max > 0.0f ? std::max(0.0f, e->shield_hp / e->shield_max) : 0.0f, e->phase2);
             continue;
         }
         if (e->type == EnemyType::Flyer) continue;
@@ -2251,13 +3148,17 @@ void render_world(Game& game) {
             draw_heart(e->pos + Vec2{0, -e->radius - 14 + bob}, std::max(4.0f, e->radius * 0.28f),
                        Color{255, 110, 160, 230});
         }
+        float rage_k = e->type == EnemyType::Berserker ? std::clamp(1.0f - e->hp / e->max_hp, 0.0f, 1.0f) : 0.0f;
         draw_monster(g, e->type, e->pos, e->radius, e->anim, e->flash, e->slow_timer > 0.0f, e->elite, game.time,
                      e->shield_max > 0.0f ? std::max(0.0f, e->shield_hp / e->shield_max) : 0.0f, e->shield_flash,
-                     e->armor > 0.0f, run.theme.enemy_tint, run.theme.enemy_tint_amount, run.theme.biome, e->hurt);
+                     e->armor > 0.0f, run.theme.enemy_tint, run.theme.enemy_tint_amount, run.theme.biome, e->hurt,
+                     e->freeze_timer > 0.0f, e->burrowed, e->corrode_timer > 0.0f, e->warlord_buff > 0.0f, rage_k);
         bool show_bar =
             (e->type == EnemyType::Brute || e->type == EnemyType::Spitter || e->type == EnemyType::Exploder ||
-             e->type == EnemyType::Splitter || e->type == EnemyType::Shielder || e->elite || e->mini_boss) &&
-            e->hp < e->max_hp;
+             e->type == EnemyType::Splitter || e->type == EnemyType::Shielder || e->type == EnemyType::Healer ||
+             e->type == EnemyType::Burrower || e->type == EnemyType::Berserker || e->type == EnemyType::Warlord ||
+             e->elite || e->mini_boss) &&
+            e->hp < e->max_hp && !e->burrowed;
         if (show_bar && !(e->type == EnemyType::Boss && !e->mini_boss)) {
             float w = e->radius * 1.8f;
             bar({e->pos.x - w * 0.5f, e->pos.y - e->radius - 16, w, 7}, e->hp / e->max_hp, Color{240, 70, 60, 255},
@@ -2270,7 +3171,7 @@ void render_world(Game& game) {
     for (const Enemy* e : order) {
         if (e->type != EnemyType::Flyer) continue;
         Color bat = blend(enemy_body_color(EnemyType::Flyer), run.theme.enemy_tint, run.theme.enemy_tint_amount);
-        if (e->slow_timer > 0.0f) bat = mix(bat, Color{170, 220, 255, 255}, 0.45f);
+        if (e->slow_timer > 0.0f || e->freeze_timer > 0.0f) bat = mix(bat, Color{170, 220, 255, 255}, 0.5f);
         draw_bat(g, e->pos, e->radius, e->anim, e->flash, bat, e->elite, game.time);
     }
     for (const auto& f : run.loot) draw_loot(game, f);
@@ -2288,24 +3189,55 @@ void render_world(Game& game) {
     if (run.collapse_t < 0.0f) draw_turrets(game, run);
 
     int visible = visible_soldiers(run.soldiers);
+    // Dynamic tactical formation guide hugging the actual soldier extents in every formation!
+    if (visible > 0 && run.collapse_t < 0.0f) {
+        float min_x = 1e9f, max_x = -1e9f, min_y = 1e9f, max_y = -1e9f;
+        for (int i = 0; i < visible; ++i) {
+            Vec2 o = run.soldier_off_cur[static_cast<size_t>(i)];
+            min_x = std::min(min_x, o.x);
+            max_x = std::max(max_x, o.x);
+            min_y = std::min(min_y, o.y);
+            max_y = std::max(max_y, o.y);
+        }
+        float pad_x = 22.0f;
+        float pad_top = 18.0f;
+        float pad_bot = 16.0f;
+        Rectangle box{run.squad_x + min_x - pad_x, SQUAD_Y + min_y - pad_top, (max_x - min_x) + pad_x * 2.0f,
+                      (max_y - min_y) + pad_top + pad_bot};
+        Color fc = run.formation == Formation::Wedge   ? Color{255, 195, 70, 80}
+                   : run.formation == Formation::Guard ? Color{110, 220, 150, 75}
+                                                       : Color{110, 195, 255, 70};
+        if (run.formation == Formation::Wedge) {
+            Vec2 tip{run.squad_x, box.y - 2.0f};
+            Vec2 bl{box.x, box.y + box.height};
+            Vec2 br{box.x + box.width, box.y + box.height};
+            tri(tip, bl, br, with_alpha(fc, 0.22f));
+            line(bl, tip, 3.0f, fc);
+            line(br, tip, 3.0f, fc);
+        } else {
+            DrawRectangleRounded(box, 0.3f, 6, with_alpha(fc, 0.32f));
+            DrawRectangleRoundedLinesEx(box, 0.3f, 6, 2.0f, fc);
+        }
+    }
     for (int i = visible - 1; i >= 0; --i) {
-        Vec2 p = Vec2{run.squad_x, SQUAD_Y} + soldier_offset(i, visible);
+        Vec2 p = Vec2{run.squad_x, SQUAD_Y} + run.soldier_off_cur[static_cast<size_t>(i)];
         float bob = std::sin(game.time * 10.0f + static_cast<float>(i)) *
                     (std::abs(run.squad_target_x - run.squad_x) > 4 ? 2.0f : 0.0f);
         UnitType u = run.squad[static_cast<size_t>(i) % run.squad.size()];
         float join = std::min(1.0f, run.soldier_join[static_cast<size_t>(i)]);
         float drop = join > 0.0f ? -std::sin(join * PI * 0.5f) * 60.0f : 0.0f;
         float pop = join > 0.0f ? 1.0f + 0.35f * std::sin(join * PI) : 1.0f;
+        if (run.frenzy_t > 0.0f) glow(g, p + Vec2{0, bob}, 24.0f, Color{255, 200, 60, 80});
         if (join > 0.0f) ellipse(g, p + Vec2{0, 9}, 11.0f * (1.0f - join * 0.6f), 4.0f, Color{0, 0, 0, 60});
         draw_soldier(g, p + Vec2{0, bob + drop}, run.soldier_recoil[static_cast<size_t>(i)], u, SOLDIER_SCALE * pop,
-                     game.time, run.theme.biome);
+                     game.time, run.theme.biome, run.unit_levels[static_cast<size_t>(u)]);
     }
     draw_corpses(game, run);
     if (run.collapse_t < 0.0f && run.soldiers > 0) {
         KidPose pose = run.frenzy_t > 0.0f           ? KidPose::Rally
                        : run.phase == WavePhase::Won ? KidPose::Cheer
                                                      : KidPose::Idle;
-        draw_kid(g, Kid::Omar, {omar_x(run.squad_x, visible), SQUAD_Y + 22}, 0.95f, pose, game.time);
+        draw_kid(g, Kid::Omar, {omar_x(run.squad_x, visible, run.formation), SQUAD_Y + 22}, 0.95f, pose, game.time);
     }
     if (run.collapse_t >= 0.0f) draw_wall_collapse(run, g);
     if (run.ali_t >= 0.0f) {
@@ -2313,18 +3245,92 @@ void render_world(Game& game) {
         float rise = t < 0.25f ? 1.0f - t / 0.25f : t > 1.9f ? (t - 1.9f) / 0.3f : 0.0f;
         float hop = std::abs(std::sin(t * 6.0f)) * 10.0f * (1.0f - rise);
         Vec2 feet{VIRTUAL_W * 0.5f, WALL_TOP - 8.0f + rise * 120.0f - hop};
-        BeginBlendMode(BLEND_ADDITIVE);
-        glow(g, feet + Vec2{0, -60}, 150, Color{255, 140, 190, static_cast<unsigned char>(120 * (1.0f - rise))});
-        EndBlendMode();
+        glow(g, feet + Vec2{0, -60}, 150, Color{255, 140, 190, static_cast<unsigned char>(125 * (1.0f - rise))});
         draw_kid(g, Kid::Ali, feet, 1.6f * (1.0f - 0.3f * rise), KidPose::Peace, game.time);
+    }
+    if (run.salama_t >= 0.0f) {
+        float t = run.salama_t;
+        float rise = t < 0.25f ? 1.0f - t / 0.25f : t > 1.9f ? (t - 1.9f) / 0.3f : 0.0f;
+        float hop = std::abs(std::sin(t * 7.0f)) * 12.0f * (1.0f - rise);
+        Vec2 feet{VIRTUAL_W * 0.5f, WALL_TOP - 8.0f + rise * 120.0f - hop};
+        glow(g, feet + Vec2{0, -64}, 160, Color{255, 215, 75, static_cast<unsigned char>(135 * (1.0f - rise))});
+        draw_kid(g, Kid::Salama, feet, 1.65f * (1.0f - 0.3f * rise), KidPose::BabaThrow, game.time);
     }
 
     if (run.plane_t >= 0.0f) {
-        float x = -120.0f + run.plane_t * (VIRTUAL_W + 240.0f) / 1.2f;
-        if (auto* sh = game.assets.get_texture("plane_shadow")) {
-            sprite(*sh, {x - 30, run.plane_y + 60}, 150, 150, 90, Color{0, 0, 0, 90});
+        // 3-Jet V-Formation Strike Squadron: crisp swept-wing fighter jets flying left-to-right!
+        float lead_x = -120.0f + run.plane_t * (VIRTUAL_W + 280.0f) / 1.35f;
+        const Vec2 offsets[3] = {{0.0f, -42.0f}, {-88.0f, -112.0f}, {-88.0f, 28.0f}};
+        const float scales[3] = {1.0f, 0.78f, 0.78f};
+        bool orb = run.stats.orbital_strike;
+        Color hull = orb ? Color{118, 92, 146, 255} : Color{116, 130, 148, 255};
+        Color hull_hi = brighten(hull, 0.28f);
+        Color hull_lo = darken(hull, 0.34f);
+        Color stripe = orb ? Color{255, 95, 200, 255} : Color{235, 75, 50, 255};
+        Color ab_outer = orb ? Color{255, 95, 200, 235} : Color{255, 130, 40, 235};
+        Color ab_inner = Color{255, 245, 190, 250};
+
+        auto draw_jet_shape = [&](Vec2 c, float s, Color col) {
+            // Swept delta main wings
+            tri(c + Vec2{24 * s, 0}, c + Vec2{-24 * s, -54 * s}, c + Vec2{-34 * s, -50 * s}, col);
+            tri(c + Vec2{24 * s, 0}, c + Vec2{-34 * s, -50 * s}, c + Vec2{-14 * s, 0}, col);
+            tri(c + Vec2{24 * s, 0}, c + Vec2{-14 * s, 0}, c + Vec2{-34 * s, 50 * s}, col);
+            tri(c + Vec2{24 * s, 0}, c + Vec2{-34 * s, 50 * s}, c + Vec2{-24 * s, 54 * s}, col);
+            // Tail stabilizers
+            tri(c + Vec2{-22 * s, 0}, c + Vec2{-44 * s, -24 * s}, c + Vec2{-48 * s, -20 * s}, col);
+            tri(c + Vec2{-22 * s, 0}, c + Vec2{-48 * s, -20 * s}, c + Vec2{-38 * s, 0}, col);
+            tri(c + Vec2{-22 * s, 0}, c + Vec2{-38 * s, 0}, c + Vec2{-48 * s, 20 * s}, col);
+            tri(c + Vec2{-22 * s, 0}, c + Vec2{-48 * s, 20 * s}, c + Vec2{-44 * s, 24 * s}, col);
+            // Sleek pointed fuselage
+            tri(c + Vec2{56 * s, 0}, c + Vec2{18 * s, -10 * s}, c + Vec2{18 * s, 10 * s}, col);
+            DrawRectangleRounded({c.x - 42 * s, c.y - 10 * s, 62 * s, 20 * s}, 0.5f, 4, col);
+        };
+
+        // Ground shadows swept dramatically beneath each fighter jet
+        for (int j = 0; j < 3; ++j) {
+            Vec2 jp{lead_x + offsets[j].x, run.plane_y + offsets[j].y};
+            draw_jet_shape(jp + Vec2{-28.0f, 88.0f}, scales[j] * 0.92f, Color{10, 14, 24, 72});
         }
-        if (auto* pl = game.assets.get_texture("plane")) sprite(*pl, {x, run.plane_y - 40}, 150, 150, 90, WHITE);
+        // Single batched additive pass for contrails + roaring twin afterburners!
+        BeginBlendMode(BLEND_ADDITIVE);
+        for (int j = 0; j < 3; ++j) {
+            Vec2 jp{lead_x + offsets[j].x, run.plane_y + offsets[j].y};
+            float s = scales[j];
+            float flick = 0.78f + 0.22f * std::sin(game.time * 48.0f + static_cast<float>(j) * 2.1f);
+            line({jp.x - 28.0f * s, jp.y - 52.0f * s}, {jp.x - 170.0f * s, jp.y - 52.0f * s}, 3.2f * s,
+                 Color{225, 240, 255, 110});
+            line({jp.x - 28.0f * s, jp.y + 52.0f * s}, {jp.x - 170.0f * s, jp.y + 52.0f * s}, 3.2f * s,
+                 Color{225, 240, 255, 110});
+            for (int e = -1; e <= 1; e += 2) {
+                Vec2 eng = jp + Vec2{-42.0f * s, static_cast<float>(e) * 7.5f * s};
+                glow(g, eng, 26.0f * s * flick, ab_outer);
+                tri(eng + Vec2{0, -5.5f * s}, eng + Vec2{0, 5.5f * s}, eng + Vec2{-46.0f * s * flick, 0}, ab_outer);
+                tri(eng + Vec2{0, -3.0f * s}, eng + Vec2{0, 3.0f * s}, eng + Vec2{-26.0f * s * flick, 0}, ab_inner);
+            }
+        }
+        EndBlendMode();
+        // Crisp fighter jet bodies, squadron wing stripes, glass canopies & navigation strobes!
+        for (int j = 0; j < 3; ++j) {
+            Vec2 jp{lead_x + offsets[j].x, run.plane_y + offsets[j].y};
+            float s = scales[j];
+            draw_jet_shape(jp, s * 1.06f, Color{24, 28, 38, 255});
+            draw_jet_shape(jp, s, hull);
+            // Wing squadron stripes & fuselage highlight
+            line(jp + Vec2{-14 * s, -34 * s}, jp + Vec2{-25 * s, -45 * s}, 5.0f * s, stripe);
+            line(jp + Vec2{-14 * s, 34 * s}, jp + Vec2{-25 * s, 45 * s}, 5.0f * s, stripe);
+            line(jp + Vec2{44 * s, 0}, jp + Vec2{-32 * s, 0}, 5.0f * s, hull_hi);
+            // Twin dark engine nozzles
+            DrawRectangleRec({jp.x - 45 * s, jp.y - 11 * s, 8 * s, 7 * s}, hull_lo);
+            DrawRectangleRec({jp.x - 45 * s, jp.y + 4 * s, 8 * s, 7 * s}, hull_lo);
+            // Glowing cyan glass canopy
+            ellipse(g, jp + Vec2{16 * s, 0}, 15 * s, 5.8f * s, Color{22, 34, 48, 255});
+            ellipse(g, jp + Vec2{17 * s, 0}, 12.5f * s, 4.4f * s, Color{110, 225, 255, 255});
+            ellipse(g, jp + Vec2{20 * s, -1.5f * s}, 5.5f * s, 1.8f * s, Color{235, 252, 255, 230});
+            // Wingtip navigation strobes
+            float blink = std::sin(game.time * 18.0f + static_cast<float>(j)) > 0.0f ? 1.0f : 0.35f;
+            disc(g, jp + Vec2{-28 * s, -52 * s}, 3.6f * s, with_alpha(Color{255, 70, 60, 255}, blink));
+            disc(g, jp + Vec2{-28 * s, 52 * s}, 3.6f * s, with_alpha(Color{80, 255, 120, 255}, blink));
+        }
     }
 
     for (const auto& f : run.coin_flies) {

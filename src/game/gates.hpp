@@ -24,6 +24,10 @@ struct GateState {
     int points{0};
 };
 
+inline bool gate_is_stat(GateKind k) {
+    return k == GateKind::Rate || k == GateKind::Power || k == GateKind::Crit || k == GateKind::Turret;
+}
+
 // Gate growth is paced against the squad's raw fire output, so a 5-man squad and a
 // 200-man squad both need several seconds of focused fire to move a gate meaningfully.
 inline int hits_per_point(float shots_per_sec) {
@@ -57,7 +61,7 @@ inline bool gate_hit(GateState& g, int hits_needed, float growth, int soldiers) 
         g.value = std::min(cap, g.value + pts * add_step(soldiers));
         return true;
     }
-    if (g.kind == GateKind::Rate || g.kind == GateKind::Power) {
+    if (gate_is_stat(g.kind)) {
         int before = g.value;
         g.value = g.red ? std::max(STAT_MIN, g.value - STAT_STEP * pts) : std::min(STAT_MAX, g.value + STAT_STEP * pts);
         return g.value != before;
@@ -98,6 +102,8 @@ inline GateState gate_after_hits(GateState g, int hits, int hits_needed, float g
     }
     case GateKind::Rate:
     case GateKind::Power:
+    case GateKind::Crit:
+    case GateKind::Turret:
         g.points += triggers * pts;
         g.value = g.red ? std::max(STAT_MIN, g.value - STAT_STEP * pts * triggers)
                         : std::min(STAT_MAX, g.value + STAT_STEP * pts * triggers);
@@ -117,7 +123,7 @@ inline GateState gate_after_hits(GateState g, int hits, int hits_needed, float g
 
 inline int apply_gate(int soldiers, const GateState& g) {
     long long out = soldiers;
-    if (g.kind == GateKind::Rate || g.kind == GateKind::Power) return soldiers;
+    if (gate_is_stat(g.kind)) return soldiers;
     if (g.kind == GateKind::Add) {
         out = soldiers + static_cast<long long>(g.value);
     } else if (g.value > 0) {
@@ -144,9 +150,17 @@ inline std::vector<GateState> roll_gate_row(Rng& rng, int wave, int soldiers, in
     for (int i = 0; i < lanes; ++i) {
         GateState g;
         g.red = i == red_lane || (i != blue_lane && rng.chance(0.5f));
-        if (rng.chance(0.15f)) {
-            // Stat gates change the whole squad's guns for the rest of the run, in percent.
-            g.kind = rng.chance(0.5f) ? GateKind::Rate : GateKind::Power;
+        if (rng.chance(0.20f)) {
+            // Stat gates change the whole squad's guns or turrets for the rest of the run, in percent.
+            int stat_roll = rng.range(0, 99);
+            if (stat_roll < 36)
+                g.kind = GateKind::Rate;
+            else if (stat_roll < 72)
+                g.kind = GateKind::Power;
+            else if (stat_roll < 88)
+                g.kind = GateKind::Crit;
+            else
+                g.kind = GateKind::Turret;
             g.value = g.red ? -rng.range(4, 10) : -rng.range(2, 8);
         } else if (rng.chance(0.14f)) {
             g.kind = GateKind::Mul;

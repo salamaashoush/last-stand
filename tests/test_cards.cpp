@@ -52,3 +52,17 @@ TEST_CASE("fortify raises max wall and asks for a full repair", "[cards]") {
     CHECK(s.wall_max > 1000.0f);
     CHECK(fx.repair_fraction == 1.0f);
 }
+
+TEST_CASE("new evolutions unlock from their pairs and grant their effects", "[cards]") {
+    RunStats s;
+    CHECK(evolution_partner(CardId::Fortify) == CardId::Overclock);
+    CHECK_FALSE(card_available(s, CardId::FortressOverdrive));
+    apply_card(s, CardId::Fortify);
+    apply_card(s, CardId::Fortify);
+    apply_card(s, CardId::Overclock);
+    apply_card(s, CardId::Overclock);
+    CHECK(card_available(s, CardId::FortressOverdrive));
+    auto fx = apply_card(s, CardId::FortressOverdrive);
+    CHECK(fx.grant_shield);
+    CHECK(s.aegis_wall);
+}

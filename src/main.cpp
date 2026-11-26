@@ -19,7 +19,7 @@ ls::Game* g_game = nullptr;
 bool g_game_touch = false;
 
 void draw_toasts(ls::Game& game, float dt) {
-    float y = 120.0f;
+    float y = 26.0f;
     for (auto& t : game.toasts) {
         t.timer -= dt;
         float a = std::min(1.0f, t.timer * 2.0f);
@@ -49,10 +49,11 @@ void capture_if_requested(ls::Game& game) {
 }
 
 #ifdef __EMSCRIPTEN__
-// Render at the screen's real pixel density (capped) so phones get a sharp image; touch and
-// mouse input are already scaled by raylib from CSS pixels to canvas pixels.
+// Render at the screen's real pixel density (capped lower on mobile touch devices to keep
+// WebGL fill-rate and battery usage lean); raylib scales touch/mouse coordinates automatically.
 void fit_canvas() {
-    double dpr = std::min(EM_ASM_DOUBLE({ return window.devicePixelRatio || 1; }), 2.5);
+    double cap = g_game_touch ? 1.75 : 2.0;
+    double dpr = std::min(EM_ASM_DOUBLE({ return window.devicePixelRatio || 1; }), cap);
     int w = static_cast<int>(EM_ASM_DOUBLE({ return Module.canvas.getBoundingClientRect().width; }) * dpr);
     int h = static_cast<int>(EM_ASM_DOUBLE({ return Module.canvas.getBoundingClientRect().height; }) * dpr);
     if (w > 0 && h > 0 && (w != GetScreenWidth() || h != GetScreenHeight())) SetWindowSize(w, h);
@@ -78,25 +79,30 @@ void frame() {
     ls::end_canvas();
 
     Rectangle src{0, 0, static_cast<float>(game.canvas.texture.width), -static_cast<float>(game.canvas.texture.height)};
-    static RenderTexture2D blur = [] {
-        RenderTexture2D t = LoadRenderTexture(18, 32);
-        SetTextureFilter(t.texture, TEXTURE_FILTER_BILINEAR);
-        return t;
-    }();
-    BeginTextureMode(blur);
-    DrawTexturePro(game.canvas.texture, src, {0, 0, 18, 32}, {0, 0}, 0.0f, WHITE);
-    EndTextureMode();
+    bool letterboxed = game.viewport.x > 2.0f || game.viewport.y > 2.0f;
+    static RenderTexture2D blur{};
+    if (letterboxed) {
+        if (blur.id == 0) {
+            blur = LoadRenderTexture(18, 32);
+            SetTextureFilter(blur.texture, TEXTURE_FILTER_BILINEAR);
+        }
+        BeginTextureMode(blur);
+        DrawTexturePro(game.canvas.texture, src, {0, 0, 18, 32}, {0, 0}, 0.0f, WHITE);
+        EndTextureMode();
+    }
 
     BeginDrawing();
     ClearBackground(Color{6, 6, 12, 255});
-    // Letterbox bars show a dimmed, heavily blurred copy of the scene instead of flat black.
-    float sw = static_cast<float>(GetScreenWidth());
-    float sh = static_cast<float>(GetScreenHeight());
-    float cover = std::max(sw / ls::VIRTUAL_W, sh / ls::VIRTUAL_H) * 1.15f;
-    Rectangle bg{(sw - ls::VIRTUAL_W * cover) * 0.5f, (sh - ls::VIRTUAL_H * cover) * 0.5f, ls::VIRTUAL_W * cover,
-                 ls::VIRTUAL_H * cover};
-    Rectangle blur_src{0, 0, 18, -32};
-    DrawTexturePro(blur.texture, blur_src, bg, {0, 0}, 0.0f, Color{80, 80, 92, 255});
+    if (letterboxed) {
+        // Letterbox bars show a dimmed, heavily blurred copy of the scene instead of flat black.
+        float sw = static_cast<float>(GetScreenWidth());
+        float sh = static_cast<float>(GetScreenHeight());
+        float cover = std::max(sw / ls::VIRTUAL_W, sh / ls::VIRTUAL_H) * 1.15f;
+        Rectangle bg{(sw - ls::VIRTUAL_W * cover) * 0.5f, (sh - ls::VIRTUAL_H * cover) * 0.5f, ls::VIRTUAL_W * cover,
+                     ls::VIRTUAL_H * cover};
+        Rectangle blur_src{0, 0, 18, -32};
+        DrawTexturePro(blur.texture, blur_src, bg, {0, 0}, 0.0f, Color{80, 80, 92, 255});
+    }
     DrawTexturePro(game.canvas.texture, src, game.viewport, {0, 0}, 0.0f, WHITE);
     if (std::getenv("LS_DEBUG_SIZE")) {
         static int n = 0;
@@ -138,8 +144,8 @@ int main() {
 #endif
     InitWindow(540, 960, "Last Stand - Horde Defense");
 #ifdef __EMSCRIPTEN__
-    fit_canvas();
     g_game_touch = EM_ASM_INT({ return window.matchMedia('(pointer: coarse)').matches ? 1 : 0; }) != 0;
+    fit_canvas();
 #else
     int monitor = GetCurrentMonitor();
     int h = std::min(1100, static_cast<int>(static_cast<float>(GetMonitorHeight(monitor)) * 0.85f));
@@ -174,9 +180,9 @@ int main() {
         game->persist = false;
         game->meta = ls::MetaProgress{};
         game->meta.gems = 1234;
-        game->meta.unlocked_stage = 5;
-        game->meta.unit_levels = {4, 2, 0, 1, 0, 0};
-        game->meta.loadout = {0, 1, 3};
+        game->meta.unlocked_stage = 6;
+        game->meta.unit_levels = {4, 2, 0, 1, 0, 0, 2, 0};
+        game->meta.loadout = {0, 1, 3, 6};
         for (int page = 0; page < ls::gallery_page_count(); ++page) {
             game->input = {};
             ls::gallery_prepare(*game, page);
