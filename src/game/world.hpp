@@ -173,9 +173,9 @@ struct StageZone {
     ZoneKind kind{ZoneKind::IceSlick};
     Vec2 pos{};
     float radius{64.0f};
-    float timer{0.0f};    // active countdown or eruption cycle
+    float timer{0.0f};     // active countdown or eruption cycle
     float max_life{-1.0f}; // < 0 means persistent for the stage
-    float charge{0.0f};   // 0..1 telegraph fill (e.g., lava eruption)
+    float charge{0.0f};    // 0..1 telegraph fill (e.g., lava eruption)
     float seed{0.0f};
     bool active{true};
 };

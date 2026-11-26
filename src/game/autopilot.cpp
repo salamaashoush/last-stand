@@ -121,12 +121,11 @@ void autopilot_update(Game& game, float dt) {
                                                       TurretType::Flamer};
     for (int s = 0; s < TURRET_SLOTS; ++s) {
         auto& t = run.turrets[static_cast<size_t>(s)];
-        TurretType pref = turret_unlocked(order[s], run.unlocked_stage) ? order[s]
+        TurretType pref = turret_unlocked(order[s], run.unlocked_stage)                      ? order[s]
                           : turret_unlocked(TurretType::Laser, run.unlocked_stage) && s == 3 ? TurretType::Laser
                                                                                              : fallback[s];
         TurretType type = t.type == TurretType::None ? pref : t.type;
-        if (t.level < TURRET_MAX_LEVEL &&
-            run.coins >= turret_upgrade_cost(type, t.level, run.turret_cost_mult) + 20) {
+        if (t.level < TURRET_MAX_LEVEL && run.coins >= turret_upgrade_cost(type, t.level, run.turret_cost_mult) + 20) {
             build_or_upgrade(game, s, type);
             break;
         }
@@ -139,7 +138,7 @@ namespace ls {
 
 void autopilot_spend(Game& game) {
     auto& m = game.meta;
-    static const MetaId priority[] = {MetaId::Firepower, MetaId::RateOfFire, MetaId::Recruits,  MetaId::TurretTech,
+    static const MetaId priority[] = {MetaId::Firepower, MetaId::RateOfFire, MetaId::Recruits, MetaId::TurretTech,
                                       MetaId::Commander, MetaId::Fortress,   MetaId::WarChest, MetaId::Lucky};
     bool bought = true;
     for (int u = 1; u < UNIT_COUNT; ++u) {

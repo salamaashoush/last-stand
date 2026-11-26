@@ -408,10 +408,10 @@ void ResultsState::render(Game& game) {
                                                                       : (r.endless ? "OVERRUN" : "DEFEAT");
     Color tc = r.won ? GOLD_TINT : Color{255, 90, 80, 255};
     text(g, title, {VIRTUAL_W * 0.5f, 114}, 88 * (0.6f + 0.4f * in), tc);
-    std::string sub = r.endless                             ? std::format("SURVIVED {} WAVES", r.waves_cleared)
-                      : (r.won && r.stage == MAX_STAGE)     ? "ALL 10 STAGES CONQUERED!"
-                      : r.won                               ? std::format("STAGE {} CLEARED", r.stage)
-                                                            : std::format("STAGE {}  -  REACHED WAVE {}", r.stage, r.waves_cleared + 1);
+    std::string sub = r.endless                         ? std::format("SURVIVED {} WAVES", r.waves_cleared)
+                      : (r.won && r.stage == MAX_STAGE) ? "ALL 10 STAGES CONQUERED!"
+                      : r.won ? std::format("STAGE {} CLEARED", r.stage)
+                              : std::format("STAGE {}  -  REACHED WAVE {}", r.stage, r.waves_cleared + 1);
     text(g, sub, {VIRTUAL_W * 0.5f, 180}, 26, WHITE);
 
     if (r.won && !r.endless) {
@@ -587,7 +587,9 @@ void ArmoryState::render(Game& game) {
             int id = meta.loadout[static_cast<size_t>(sl)];
             bool filled = open && id >= 0 && id < UNIT_COUNT;
             Color fill = !open ? Color{26, 26, 34, 200} : filled ? Color{30, 54, 44, 235} : Color{32, 36, 52, 220};
-            Color edge = !open ? Color{70, 70, 82, 255} : filled ? Color{110, 230, 130, 255} : Color{110, 145, 210, 220};
+            Color edge = !open    ? Color{70, 70, 82, 255}
+                         : filled ? Color{110, 230, 130, 255}
+                                  : Color{110, 145, 210, 220};
             DrawRectangleRounded(r, 0.3f, 6, fill);
             DrawRectangleRoundedLinesEx(r, 0.3f, 6, 2.0f, edge);
             if (!open) {
@@ -622,10 +624,8 @@ void ArmoryState::render(Game& game) {
         // Active squad synergy bar
         auto syn = compute_synergies(meta.squad());
         Rectangle syn_bar{30, 304, VIRTUAL_W - 60, 28};
-        DrawRectangleRounded(syn_bar, 0.45f, 6,
-                             syn.count() > 0 ? Color{24, 52, 38, 220} : Color{24, 28, 44, 210});
-        DrawRectangleRoundedLinesEx(syn_bar, 0.45f, 6, 1.5f,
-                                    syn.count() > 0 ? Color{110, 235, 145, 220} : PANEL_EDGE);
+        DrawRectangleRounded(syn_bar, 0.45f, 6, syn.count() > 0 ? Color{24, 52, 38, 220} : Color{24, 28, 44, 210});
+        DrawRectangleRoundedLinesEx(syn_bar, 0.45f, 6, 1.5f, syn.count() > 0 ? Color{110, 235, 145, 220} : PANEL_EDGE);
         std::string syn_str;
         auto add_syn = [&](const char* s) {
             if (!syn_str.empty()) syn_str += "  |  ";
@@ -680,7 +680,8 @@ void ArmoryState::render(Game& game) {
             if (u == UnitType::Sniper) spec *= 1.45f;
             float dmg = def.damage_mult * def.rate_mult * static_cast<float>(def.pellets) * spec *
                         unit_damage_mult(std::max(1, lvl)) * unit_rate_mult(std::max(1, lvl));
-            text(g, owned ? std::format("LV {}  PWR {:.0f}", lvl, dmg * 100.0f) : std::format("PWR {:.0f}", dmg * 100.0f),
+            text(g,
+                 owned ? std::format("LV {}  PWR {:.0f}", lvl, dmg * 100.0f) : std::format("PWR {:.0f}", dmg * 100.0f),
                  {r.x + 16, r.y + 108}, 14, Color{255, 210, 110, 255}, Align::Left, false);
             if (owned) {
                 for (int p = 0; p < UNIT_MAX_LEVEL; ++p) {

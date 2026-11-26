@@ -604,9 +604,9 @@ void draw_monster(const Gfx& g, EnemyType type, Vec2 p, float r, float anim, flo
 // so arms and shoulders grow out of the body instead of sitting on top of it.
 void draw_boss(const Gfx& g, const BossGenome& gen, int biome, Vec2 p, float r, float anim, float flash, bool enraged,
                float time, float shield_ratio, bool phase2) {
-    Color base = enraged ? mix(gen.body, Color{200, 30, 20, 255}, 0.4f + 0.15f * std::sin(time * 10.0f))
-                         : phase2 ? mix(gen.body, gen.accent, 0.15f + 0.08f * std::sin(time * 6.0f))
-                                  : gen.body;
+    Color base = enraged  ? mix(gen.body, Color{200, 30, 20, 255}, 0.4f + 0.15f * std::sin(time * 10.0f))
+                 : phase2 ? mix(gen.body, gen.accent, 0.15f + 0.08f * std::sin(time * 6.0f))
+                          : gen.body;
     Color body = darken(base, 0.08f);
     Color shade = darken(base, 0.42f);
     Color rim = brighten(base, 0.28f);
@@ -816,8 +816,8 @@ void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, f
     Color dark{34, 34, 40, 255};
     Color metal{86, 88, 98, 255};
     Color skin{232, 184, 140, 255};
-    static const Color outfit[BIOME_COUNT] = {{96, 116, 64, 255},   {206, 178, 128, 255}, {236, 240, 248, 255},
-                                              {64, 62, 68, 255},    {74, 108, 72, 255},   {88, 72, 134, 255}};
+    static const Color outfit[BIOME_COUNT] = {{96, 116, 64, 255}, {206, 178, 128, 255}, {236, 240, 248, 255},
+                                              {64, 62, 68, 255},  {74, 108, 72, 255},   {88, 72, 134, 255}};
     Color uni = biome >= 0 && biome < BIOME_COUNT ? mix(def.uniform, outfit[biome], 0.3f) : def.uniform;
     Color uni_dark = darken(uni, 0.5f);
     float kick = recoil * S(3.0f);
@@ -939,7 +939,8 @@ void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, f
     }
     case UnitType::Cryo: {
         gun(4.2f, Color{74, 120, 152, 255});
-        DrawRectangleV({hand.x - S(1.5f), hand.y - S(len * 0.85f)}, {S(3.0f), S(len * 0.5f)}, Color{160, 235, 255, 255});
+        DrawRectangleV({hand.x - S(1.5f), hand.y - S(len * 0.85f)}, {S(3.0f), S(len * 0.5f)},
+                       Color{160, 235, 255, 255});
         glow(g, {hand.x, hand.y - S(len)}, S(5.5f), Color{140, 235, 255, 200});
         break;
     }
@@ -961,8 +962,8 @@ void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, f
 
     if (recoil > 0.55f && def.shot != Shot::Flame) {
         Vec2 tip = p + muzzle_offset(static_cast<int>(u), scale) + Vec2{0, kick};
-        Color fc = u == UnitType::Cryo   ? Color{140, 235, 255, 255}
-                   : u == UnitType::Volt ? Color{195, 145, 255, 255}
+        Color fc = u == UnitType::Cryo     ? Color{140, 235, 255, 255}
+                   : u == UnitType::Volt   ? Color{195, 145, 255, 255}
                    : u == UnitType::Sniper ? Color{255, 248, 195, 255}
                                            : Color{255, 215, 105, 255};
         float fl = (u == UnitType::Shotgunner ? 15.0f : u == UnitType::Sniper ? 14.0f : 10.5f) * recoil;
@@ -971,8 +972,8 @@ void draw_soldier(const Gfx& g, Vec2 p, float recoil, UnitType u, float scale, f
         // Sharp 3-spike directional muzzle star!
         tri(tip + Vec2{S(-fw * 0.65f), 0}, tip + Vec2{S(fw * 0.65f), 0}, tip + Vec2{0, S(-fl * 1.45f)},
             with_alpha(fc, recoil * 0.95f));
-        tri(tip + Vec2{0, S(1.0f)}, tip + Vec2{S(-fw * 1.15f), S(-fl * 0.65f)}, tip + Vec2{S(fw * 1.15f), S(-fl * 0.65f)},
-            with_alpha(fc, recoil * 0.78f));
+        tri(tip + Vec2{0, S(1.0f)}, tip + Vec2{S(-fw * 1.15f), S(-fl * 0.65f)},
+            tip + Vec2{S(fw * 1.15f), S(-fl * 0.65f)}, with_alpha(fc, recoil * 0.78f));
         disc(g, tip + Vec2{0, S(-fl * 0.2f)}, S(fw * 0.65f), with_alpha(WHITE, recoil * 0.95f));
         if (u == UnitType::Sniper) {
             ring(g, tip + Vec2{0, S(-4.0f)}, S(8.5f * (1.2f - recoil * 0.4f)), with_alpha(fc, recoil * 0.7f));
@@ -1262,7 +1263,9 @@ void draw_wall(const Run& run) {
 }
 
 void draw_turret(const Gfx& g, TurretType type, int level, Vec2 p, float aim, float recoil, float time, float charge) {
-    Color stone = level >= 5 ? Color{168, 152, 114, 255} : level >= 3 ? Color{138, 138, 146, 255} : Color{128, 124, 118, 255};
+    Color stone = level >= 5   ? Color{168, 152, 114, 255}
+                  : level >= 3 ? Color{138, 138, 146, 255}
+                               : Color{128, 124, 118, 255};
     Color steel{92, 96, 108, 255};
     Color black{22, 22, 28, 255};
     const auto& def = turret_def(type);
@@ -1514,8 +1517,8 @@ void draw_gate(Game& game, const Gate& gate) {
     bool good = !gate.state.red;
     bool mul = gate.state.kind == GateKind::Mul;
     bool special = gate.state.kind == GateKind::Crit || gate.state.kind == GateKind::Turret;
-    Color base = !good    ? Color{230, 56, 60, 255}
-                 : mul    ? Color{110, 90, 255, 255}
+    Color base = !good     ? Color{230, 56, 60, 255}
+                 : mul     ? Color{110, 90, 255, 255}
                  : special ? Color{48, 185, 130, 255}
                            : Color{40, 150, 255, 255};
     bool negative = gate.state.value < 0 || (mul && gate.state.value == 1);
@@ -2099,7 +2102,8 @@ void prop_swamp_shroom(const Gfx& g, Vec2 at, Rng& rng) {
         Vec2 q = at + Vec2{static_cast<float>(i - 1) * 18.0f, static_cast<float>(i % 2) * 8.0f};
         float r = i == 1 ? 18.0f : 12.0f;
         prop_shadow(g, q, r * 1.1f);
-        DrawRectangleRounded({q.x - r * 0.24f, q.y - r * 0.6f, r * 0.48f, r * 1.1f}, 0.5f, 4, Color{168, 194, 148, 255});
+        DrawRectangleRounded({q.x - r * 0.24f, q.y - r * 0.6f, r * 0.48f, r * 1.1f}, 0.5f, 4,
+                             Color{168, 194, 148, 255});
         glow(g, q - Vec2{0, r * 0.55f}, r * 1.6f, Color{125, 240, 85, 85});
         ellipse(g, q - Vec2{0, r * 0.55f}, r + 2.0f, r * 0.6f + 2.0f, Color{26, 62, 36, 255});
         ellipse(g, q - Vec2{0, r * 0.55f}, r, r * 0.6f, Color{78, 198, 102, 255});
@@ -2193,10 +2197,7 @@ const std::vector<FieldProp>& field_props(const Theme& th) {
                                : Prop::Pillar;
             break;
         case 1:
-            kind = roll < 32   ? Prop::Cactus
-                   : roll < 56 ? Prop::OasisPalm
-                   : roll < 78 ? Prop::Skull
-                               : Prop::Pillar;
+            kind = roll < 32 ? Prop::Cactus : roll < 56 ? Prop::OasisPalm : roll < 78 ? Prop::Skull : Prop::Pillar;
             break;
         case 2:
             kind = roll < 34   ? Prop::Pine
@@ -2206,10 +2207,7 @@ const std::vector<FieldProp>& field_props(const Theme& th) {
                                : Prop::Pillar;
             break;
         case 3:
-            kind = roll < 32   ? Prop::DeadTree
-                   : roll < 62 ? Prop::Vent
-                   : roll < 82 ? Prop::CrystalSpire
-                               : Prop::Skull;
+            kind = roll < 32 ? Prop::DeadTree : roll < 62 ? Prop::Vent : roll < 82 ? Prop::CrystalSpire : Prop::Skull;
             break;
         case 4:
             kind = roll < 45 ? Prop::SwampShroom : roll < 74 ? Prop::Log : Prop::DeadTree;
@@ -2931,7 +2929,8 @@ void draw_shells(Game& game, const Run& run) {
             tri(bpos - bdir * 14.0f + bperp * 6.5f, bpos - bdir * 14.0f - bperp * 6.5f, bpos - bdir * 4.0f,
                 s.napalm ? Color{255, 120, 200, 255} : Color{210, 60, 45, 255});
             line(bpos - bdir * 10.0f, bpos + bdir * 7.0f, 11.0f, Color{24, 24, 30, 255});
-            line(bpos - bdir * 9.0f, bpos + bdir * 6.0f, 8.0f, s.napalm ? Color{195, 58, 135, 255} : Color{68, 72, 82, 255});
+            line(bpos - bdir * 9.0f, bpos + bdir * 6.0f, 8.0f,
+                 s.napalm ? Color{195, 58, 135, 255} : Color{68, 72, 82, 255});
             disc(g, bpos + bdir * 8.0f, 4.2f, Color{255, 210, 85, 255});
         } else if (s.frost) {
             float h = std::sin(k * PI) * 110.0f;
@@ -2998,7 +2997,10 @@ void draw_projectiles(Game& game, const Run& run) {
                      : bl.crit         ? Color{255, 155, 50, 255}
                      : bl.armor_pierce ? Color{255, 250, 185, 255}
                                        : unit_def(bl.unit).tracer;
-        float len = bl.unit == UnitType::Sniper ? 78.0f : bl.unit == UnitType::Shotgunner ? 26.0f : bl.crit ? 44.0f : 30.0f;
+        float len = bl.unit == UnitType::Sniper       ? 78.0f
+                    : bl.unit == UnitType::Shotgunner ? 26.0f
+                    : bl.crit                         ? 44.0f
+                                                      : 30.0f;
         float w = bl.unit == UnitType::Sniper ? 4.2f : bl.unit == UnitType::Shotgunner ? 3.5f : bl.crit ? 3.4f : 2.6f;
         Vec2 tail = bl.pos - dir * len;
         line(tail, bl.pos - dir * len * 0.42f, w * 0.8f, with_alpha(core, 0.32f));

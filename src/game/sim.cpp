@@ -233,9 +233,8 @@ void explosion_fx(Run& run, Vec2 pos, float radius, Color tint) {
     for (int i = 0; i < smoke_n; ++i) {
         float a = run.rng.uniform(0, 2 * PI);
         float s = run.rng.uniform(18, 68) * std::min(1.6f, k);
-        particle(run, pos + Vec2{std::cos(a), std::sin(a)} * radius * 0.25f,
-                 {std::cos(a) * s, std::sin(a) * s - 46.0f}, run.rng.uniform(0.55f, 1.05f), radius * 0.30f,
-                 radius * 0.85f, Color{42, 36, 36, 170}, PSmoke, 1.4f);
+        particle(run, pos + Vec2{std::cos(a), std::sin(a)} * radius * 0.25f, {std::cos(a) * s, std::sin(a) * s - 46.0f},
+                 run.rng.uniform(0.55f, 1.05f), radius * 0.30f, radius * 0.85f, Color{42, 36, 36, 170}, PSmoke, 1.4f);
     }
     // 3. Layered fireball clouds: bright core yellow -> vivid tint -> deep fiery crimson outer tongues.
     int fire_n = radius >= 95.0f ? 12 : 8;
@@ -498,8 +497,8 @@ void kill_enemy(Ctx& c, int idx) {
                     Color{150, 235, 80, 255}, true, true, false);
             float_text(run, "SPORE BURST!", pos + Vec2{0, -30}, Color{170, 255, 95, 255}, 38.0f, 1.0f);
         } else {
-            explode(c, pos, 135.0f, std::max(run.stats.damage * 18.0f, e.max_hp * 25.0f), true, Color{255, 140, 40, 255},
-                    true);
+            explode(c, pos, 135.0f, std::max(run.stats.damage * 18.0f, e.max_hp * 25.0f), true,
+                    Color{255, 140, 40, 255}, true);
             float_text(run, "BOOM!", pos + Vec2{0, -30}, Color{255, 200, 80, 255}, 40.0f, 1.0f);
         }
     }
@@ -690,8 +689,8 @@ void init_stage_zones(Run& run) {
         for (int i = 0; i < 3; ++i) {
             float x = 140.0f + static_cast<float>(i) * 220.0f + zrng.uniform(-35, 35);
             float y = 340.0f + static_cast<float>(i % 2) * 240.0f + zrng.uniform(-50, 50);
-            run.zones.push_back({ZoneKind::IceSlick, {x, y}, zrng.uniform(76, 98), 0.0f, -1.0f, 0.0f,
-                                 zrng.uniform(0, 100), true});
+            run.zones.push_back(
+                {ZoneKind::IceSlick, {x, y}, zrng.uniform(76, 98), 0.0f, -1.0f, 0.0f, zrng.uniform(0, 100), true});
         }
         break;
     case StageHazard::Magma: {
@@ -700,8 +699,14 @@ void init_stage_zones(Run& run) {
             float x = 110.0f + static_cast<float>(i) * (500.0f / static_cast<float>(std::max(1, cnt - 1))) +
                       zrng.uniform(-35, 35);
             float y = 330.0f + static_cast<float>((i + 1) % 2) * 240.0f + zrng.uniform(-40, 40);
-            run.zones.push_back({ZoneKind::LavaFissure, {x, y}, zrng.uniform(62, 78), zrng.uniform(1.8f, 5.0f), -1.0f,
-                                 0.0f, zrng.uniform(0, 100), true});
+            run.zones.push_back({ZoneKind::LavaFissure,
+                                 {x, y},
+                                 zrng.uniform(62, 78),
+                                 zrng.uniform(1.8f, 5.0f),
+                                 -1.0f,
+                                 0.0f,
+                                 zrng.uniform(0, 100),
+                                 true});
         }
         break;
     }
@@ -828,8 +833,8 @@ void fire_squad(Ctx& c, float dt) {
     float over = overflow_mult(run.soldiers);
     float aim_cone = formation_aim_cone_deg(run.formation) * DEG;
     float dmg_mult = formation_damage_mult(run.formation) * run.synergies.damage_mult();
-    float crit_chance =
-        std::min(0.95f, run.stats.crit_chance + formation_crit_bonus(run.formation) + (run.frenzy_t > 0.0f ? 0.20f : 0.0f));
+    float crit_chance = std::min(0.95f, run.stats.crit_chance + formation_crit_bonus(run.formation) +
+                                            (run.frenzy_t > 0.0f ? 0.20f : 0.0f));
 
     static std::vector<int> front;
     front.clear();
@@ -888,8 +893,8 @@ void fire_squad(Ctx& c, float dt) {
             Vec2 off_cur = run.soldier_off_cur[static_cast<size_t>(si)];
             Vec2 origin = Vec2{run.squad_x, SQUAD_Y} + off_cur + muzzle_offset(static_cast<int>(u));
             run.soldier_recoil[static_cast<size_t>(si)] = 1.0f;
-            float base_dmg = run.stats.damage * def.damage_mult * level_dmg * over * dmg_mult *
-                             (run.frenzy_t > 0.0f ? 1.30f : 1.0f);
+            float base_dmg =
+                run.stats.damage * def.damage_mult * level_dmg * over * dmg_mult * (run.frenzy_t > 0.0f ? 1.30f : 1.0f);
             if (def.shot == Shot::Flame || def.shot == Shot::Cryo || def.shot == Shot::Volt) {
                 base_dmg *= run.synergies.elemental_mult();
             }
@@ -987,7 +992,7 @@ void fire_squad(Ctx& c, float dt) {
             if (!played && run.shot_sound_cd <= 0.0f) {
                 played = true;
                 bool heavy = u == UnitType::Sniper || u == UnitType::Shotgunner;
-                Sfx sfx = def.shot == Shot::Flame ? Sfx::Flame
+                Sfx sfx = def.shot == Shot::Flame  ? Sfx::Flame
                           : def.shot == Shot::Volt ? Sfx::Zap
                           : def.shot == Shot::Cryo ? Sfx::IceHit
                           : heavy                  ? Sfx::ShotHeavy
@@ -1908,8 +1913,8 @@ void apply_gate_to_squad(Ctx& c, Gate& g) {
             run.stats.damage *= k;
             stat_name = "DAMAGE";
         } else if (g.state.kind == GateKind::Crit) {
-            run.stats.crit_chance = std::clamp(run.stats.crit_chance + static_cast<float>(g.state.value) / 100.0f,
-                                               0.02f, 0.95f);
+            run.stats.crit_chance =
+                std::clamp(run.stats.crit_chance + static_cast<float>(g.state.value) / 100.0f, 0.02f, 0.95f);
             stat_name = "CRIT";
         } else {
             run.stats.turret_damage_mult = std::max(0.5f, run.stats.turret_damage_mult * k);
@@ -2086,9 +2091,9 @@ void update_turrets(Ctx& c, float dt) {
         const auto& def = turret_def(t.type);
         t.cooldown -= dt * run.stats.turret_rate_mult;
         t.recoil = std::max(0.0f, t.recoil - dt * 5.0f);
-        if (t.target >= 0 && (t.target >= static_cast<int>(run.enemies.size()) ||
-                              run.enemies[static_cast<size_t>(t.target)].dead ||
-                              run.enemies[static_cast<size_t>(t.target)].burrowed)) {
+        if (t.target >= 0 &&
+            (t.target >= static_cast<int>(run.enemies.size()) || run.enemies[static_cast<size_t>(t.target)].dead ||
+             run.enemies[static_cast<size_t>(t.target)].burrowed)) {
             t.target = -1;
         }
         if (t.target == -1 || t.type == TurretType::Laser || t.type == TurretType::Cannon ||
@@ -2116,9 +2121,8 @@ void update_turrets(Ctx& c, float dt) {
             for (int k = 0; k < shells; ++k) {
                 Vec2 aim_to = k == 0 ? lead : lead + Vec2{run.rng.uniform(-46, 46), run.rng.uniform(-34, 34)};
                 float d_scale = k == 0 ? 1.0f : 0.72f;
-                run.shells.push_back(
-                    {muzzle, aim_to, 0.0f, flight + 0.07f * static_cast<float>(k), dmg * d_scale, rad, false, false,
-                     false, false, shred, false});
+                run.shells.push_back({muzzle, aim_to, 0.0f, flight + 0.07f * static_cast<float>(k), dmg * d_scale, rad,
+                                      false, false, false, false, shred, false});
             }
             t.recoil = 1.0f;
             c.game.sound.play(Sfx::Cannon, 0.45f, run.rng.uniform(0.9f, 1.1f));
@@ -2339,8 +2343,8 @@ void update_shells(Ctx& c, float dt) {
                         s.napalm ? Color{255, 95, 190, 255} : Color{255, 150, 60, 255}, s.bomb, s.grenade || s.shred,
                         false);
                 if (s.napalm) {
-                    run.zones.push_back(
-                        {ZoneKind::NapalmPool, s.to, s.radius * 0.85f, 4.0f, 4.0f, 0.0f, run.rng.uniform(0, 100), true});
+                    run.zones.push_back({ZoneKind::NapalmPool, s.to, s.radius * 0.85f, 4.0f, 4.0f, 0.0f,
+                                         run.rng.uniform(0, 100), true});
                 }
             }
         } else if (run.rng.chance(dt * 30.0f)) {
@@ -2400,7 +2404,7 @@ void update_salama_heads(Ctx& c, float dt) {
                 for (int k2 = 0; k2 < 18; ++k2) {
                     float a = run.rng.uniform(0, 2.0f * PI);
                     float sp = run.rng.uniform(160, 440);
-                    Color col = k2 % 3 == 0 ? Color{255, 220, 65, 255}
+                    Color col = k2 % 3 == 0   ? Color{255, 220, 65, 255}
                                 : k2 % 3 == 1 ? Color{110, 225, 255, 255}
                                               : Color{255, 120, 170, 255};
                     additive_particle(run, h.to, {std::cos(a) * sp, std::sin(a) * sp}, run.rng.uniform(0.45f, 0.85f),
@@ -2757,7 +2761,8 @@ void start_run(Game& game) {
     run.rng = Rng{static_cast<uint64_t>(std::time(nullptr)) * 2654435761ull +
                   static_cast<uint64_t>(GetRandomValue(0, 1 << 30))};
     run.stage = game.request.endless ? 1 : game.request.stage;
-    run.unlocked_stage = game.request.endless ? std::max(meta.unlocked_stage, 5) : std::max(meta.unlocked_stage, run.stage);
+    run.unlocked_stage =
+        game.request.endless ? std::max(meta.unlocked_stage, 5) : std::max(meta.unlocked_stage, run.stage);
     run.endless = game.request.endless;
     run.endless_record_announced = false;
     run.stats = meta.initial_stats();
@@ -2776,7 +2781,8 @@ void start_run(Game& game) {
     run.phase_timer = 2.0f;
     run.airstrike_cd = 10.0f;
     int vis = visible_soldiers(run.soldiers);
-    for (int i = 0; i < 64; ++i) run.soldier_off_cur[static_cast<size_t>(i)] = soldier_offset(i, std::max(1, vis), run.formation);
+    for (int i = 0; i < 64; ++i)
+        run.soldier_off_cur[static_cast<size_t>(i)] = soldier_offset(i, std::max(1, vis), run.formation);
     apply_theme(run);
     init_stage_zones(run);
     run.start_power = squad_power(run);
@@ -3225,7 +3231,8 @@ void update_run(Game& game, float real_dt) {
                         game.toast(std::format("NEW ENDLESS RECORD: WAVE {}!", run.wave), Color{255, 215, 75, 255});
                         game.sound.play(Sfx::LevelUp, 0.9f, 1.2f);
                     }
-                    // Every 5 waves in Endless: Realm Shift + Wall Repair + Gem Cache (+ Free Card Pick every 10 waves)!
+                    // Every 5 waves in Endless: Realm Shift + Wall Repair + Gem Cache (+ Free Card Pick every 10
+                    // waves)!
                     if (run.wave % 5 == 0) {
                         int realm = run.wave / 5;
                         bool major = (run.wave % 10 == 0);

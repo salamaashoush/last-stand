@@ -51,8 +51,8 @@ void page_enemies(Game& game) {
         auto type = static_cast<EnemyType>(t);
         float y = 114.0f + static_cast<float>(t) * 82.0f;
         float r = base_stats(type).radius * (type == EnemyType::Boss ? 0.45f : 0.85f);
-        const char* names[] = {"WALKER",   "RUNNER",   "BRUTE",    "EXPLODER",  "SPITTER", "SHIELDER", "SPLITTER",
-                               "FLYER",    "BARREL",   "BOSS",     "HEALER",    "BURROWER", "BERSERKER", "WARLORD"};
+        const char* names[] = {"WALKER", "RUNNER", "BRUTE", "EXPLODER", "SPITTER",  "SHIELDER",  "SPLITTER",
+                               "FLYER",  "BARREL", "BOSS",  "HEALER",   "BURROWER", "BERSERKER", "WARLORD"};
         text(game.gfx, names[t], {8, y}, 13, LABEL, Align::Left, false);
         for (int c = 0; c < 4; ++c) {
             Vec2 p{150.0f + static_cast<float>(c) * 160.0f, y};
@@ -304,7 +304,8 @@ void page_themes(Game& game, int set) {
         begin_camera(cam);
         draw_loot(game, l);
         end_camera();
-        const char* weather[] = {"CLEAR", "SNOW", "RAIN", "LEAVES", "EMBERS", "DUST", "FIREFLIES", "SPORES", "STARLIGHT"};
+        const char* weather[] = {"CLEAR", "SNOW",      "RAIN",   "LEAVES",   "EMBERS",
+                                 "DUST",  "FIREFLIES", "SPORES", "STARLIGHT"};
         const char* locks[] = {"ICE", "CRATE", "STONE", "CAGE", "CRYSTAL"};
         const char* decor[] = {"TREES", "ROCKS", "BONES", "CRYSTALS", "RUINS", "OBELISKS"};
         DrawRectangle(0, static_cast<int>(band_top), VIRTUAL_W, 30, Color{0, 0, 0, 150});
@@ -348,8 +349,8 @@ void page_outfits(Game& game) {
         }
         for (int u = 0; u < UNIT_COUNT; ++u) {
             draw_soldier(game.gfx,
-                         {360.0f + static_cast<float>(u % 4) * 92.0f, y - 34.0f + static_cast<float>(u / 4) * 76.0f},
-                         0, static_cast<UnitType>(u), 1.85f, game.time, b);
+                         {360.0f + static_cast<float>(u % 4) * 92.0f, y - 34.0f + static_cast<float>(u / 4) * 76.0f}, 0,
+                         static_cast<UnitType>(u), 1.85f, game.time, b);
         }
     }
 }
@@ -540,16 +541,9 @@ void gallery_prepare(Game& game, int page) {
         g_missions.enter(game);
         break;
     case 12:
-        game.result = {true,
-                       false,
-                       1,
-                       10,
-                       3,
-                       180,
-                       3,
-                       true,
-                       {"NEW TURRET: TESLA", "NEW WEAPON: GUNNER", "SQUAD SLOT 2 UNLOCKED!"},
-                       {}};
+        game.result = {
+            true, false, 1, 10, 3, 180, 3, true, {"NEW TURRET: TESLA", "NEW WEAPON: GUNNER", "SQUAD SLOT 2 UNLOCKED!"},
+            {}};
         game.result.tally.kills = 1423;
         game.result.tally.max_soldiers = 211;
         game.result.tally.max_combo = 64;

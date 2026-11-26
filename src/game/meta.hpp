@@ -12,7 +12,17 @@
 
 namespace ls {
 
-enum class MetaId : uint8_t { Recruits, Firepower, RateOfFire, Fortress, WarChest, Lucky, TurretTech, Commander, Count };
+enum class MetaId : uint8_t {
+    Recruits,
+    Firepower,
+    RateOfFire,
+    Fortress,
+    WarChest,
+    Lucky,
+    TurretTech,
+    Commander,
+    Count
+};
 
 inline constexpr int META_COUNT = static_cast<int>(MetaId::Count);
 
@@ -196,7 +206,9 @@ struct MetaProgress {
     int unit_level(UnitType u) const { return unit_levels[static_cast<size_t>(u)]; }
     bool owns(UnitType u) const { return unit_level(u) > 0; }
 
-    int loadout_slots() const { return unlocked_stage >= 6 ? 4 : unlocked_stage >= 4 ? 3 : unlocked_stage >= 2 ? 2 : 1; }
+    int loadout_slots() const {
+        return unlocked_stage >= 6 ? 4 : unlocked_stage >= 4 ? 3 : unlocked_stage >= 2 ? 2 : 1;
+    }
 
     bool in_loadout(UnitType u) const {
         for (int i = 0; i < loadout_slots(); ++i) {
@@ -377,7 +389,9 @@ struct MetaProgress {
     int starting_soldiers() const { return 5 + 2 * level(MetaId::Recruits); }
     int starting_coins() const { return 40 * level(MetaId::WarChest); }
     int rerolls() const { return level(MetaId::Lucky); }
-    float turret_cost_mult() const { return std::max(0.5f, 1.0f - 0.06f * static_cast<float>(level(MetaId::TurretTech))); }
+    float turret_cost_mult() const {
+        return std::max(0.5f, 1.0f - 0.06f * static_cast<float>(level(MetaId::TurretTech)));
+    }
     float xp_gain_mult() const { return 1.0f + 0.12f * static_cast<float>(level(MetaId::Commander)); }
 
     RunStats initial_stats() const {

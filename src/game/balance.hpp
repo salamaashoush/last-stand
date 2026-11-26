@@ -285,7 +285,8 @@ inline std::vector<SpawnEvent> build_wave(int stage, int wave, Rng& rng) {
         out.push_back({duration * (0.18f + 0.65f * rng.unit()), EnemyType::Healer, rng.uniform(lo_x + 50, hi_x - 50)});
     }
     for (int i = 0; i < counts.burrowers; ++i) {
-        out.push_back({duration * (0.12f + 0.75f * rng.unit()), EnemyType::Burrower, rng.uniform(lo_x + 30, hi_x - 30)});
+        out.push_back(
+            {duration * (0.12f + 0.75f * rng.unit()), EnemyType::Burrower, rng.uniform(lo_x + 30, hi_x - 30)});
     }
     for (int i = 0; i < counts.berserkers; ++i) {
         out.push_back(

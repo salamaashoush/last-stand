@@ -284,18 +284,48 @@ inline Theme make_theme(int key) {
         Color ground, dark, light, stone, court, fog, accent;
     };
     static const Base bases[BIOME_COUNT] = {
-        {{94, 152, 72, 255}, {72, 126, 54, 255}, {128, 178, 88, 255}, {168, 160, 150, 255}, {86, 84, 80, 255},
-         {20, 36, 20, 255}, {140, 220, 96, 255}},
-        {{214, 182, 120, 255}, {188, 152, 94, 255}, {236, 208, 150, 255}, {196, 166, 122, 255}, {118, 96, 72, 255},
-         {64, 42, 18, 255}, {245, 195, 95, 255}},
-        {{214, 226, 240, 255}, {182, 200, 222, 255}, {240, 246, 254, 255}, {146, 164, 186, 255}, {78, 92, 114, 255},
-         {24, 38, 62, 255}, {115, 215, 255, 255}},
-        {{82, 74, 74, 255}, {58, 52, 54, 255}, {112, 94, 88, 255}, {106, 96, 94, 255}, {52, 46, 48, 255},
-         {22, 8, 8, 255}, {255, 110, 42, 255}},
-        {{72, 96, 74, 255}, {50, 72, 56, 255}, {100, 128, 88, 255}, {116, 126, 112, 255}, {56, 66, 58, 255},
-         {16, 28, 20, 255}, {156, 232, 86, 255}},
-        {{68, 64, 96, 255}, {48, 44, 74, 255}, {98, 92, 134, 255}, {108, 102, 132, 255}, {48, 44, 68, 255},
-         {14, 10, 32, 255}, {176, 120, 255, 255}},
+        {{94, 152, 72, 255},
+         {72, 126, 54, 255},
+         {128, 178, 88, 255},
+         {168, 160, 150, 255},
+         {86, 84, 80, 255},
+         {20, 36, 20, 255},
+         {140, 220, 96, 255}},
+        {{214, 182, 120, 255},
+         {188, 152, 94, 255},
+         {236, 208, 150, 255},
+         {196, 166, 122, 255},
+         {118, 96, 72, 255},
+         {64, 42, 18, 255},
+         {245, 195, 95, 255}},
+        {{214, 226, 240, 255},
+         {182, 200, 222, 255},
+         {240, 246, 254, 255},
+         {146, 164, 186, 255},
+         {78, 92, 114, 255},
+         {24, 38, 62, 255},
+         {115, 215, 255, 255}},
+        {{82, 74, 74, 255},
+         {58, 52, 54, 255},
+         {112, 94, 88, 255},
+         {106, 96, 94, 255},
+         {52, 46, 48, 255},
+         {22, 8, 8, 255},
+         {255, 110, 42, 255}},
+        {{72, 96, 74, 255},
+         {50, 72, 56, 255},
+         {100, 128, 88, 255},
+         {116, 126, 112, 255},
+         {56, 66, 58, 255},
+         {16, 28, 20, 255},
+         {156, 232, 86, 255}},
+        {{68, 64, 96, 255},
+         {48, 44, 74, 255},
+         {98, 92, 134, 255},
+         {108, 102, 132, 255},
+         {48, 44, 68, 255},
+         {14, 10, 32, 255},
+         {176, 120, 255, 255}},
     };
     const auto& b = bases[t.biome];
     t.ground = jitter(b.ground, rng, 12);
@@ -313,8 +343,8 @@ inline Theme make_theme(int key) {
     t.hazard = static_cast<StageHazard>(t.biome);
     t.stage_twist = key > 100 ? ((key - 101) % 5) : 0;
     static const char* twist_tags[5] = {"ENDLESS REALM - ESCALATING HORDE", "ENDLESS BLITZ - +18% SPEED & +35% CHARGE",
-                                        "ENDLESS PHALANX - ARMORED FOES & GOLD",
-                                        "ENDLESS CATACLYSM - RAPID ERUPTIONS", "ENDLESS ECLIPSE - OVERLORD LEGION"};
+                                        "ENDLESS PHALANX - ARMORED FOES & GOLD", "ENDLESS CATACLYSM - RAPID ERUPTIONS",
+                                        "ENDLESS ECLIPSE - OVERLORD LEGION"};
     t.tagline = twist_tags[t.stage_twist];
 
     static const char* adjectives[BIOME_COUNT][6] = {
@@ -410,7 +440,7 @@ enum class BossPower : uint8_t {
 };
 
 inline const char* boss_power_name(BossPower p) {
-    static const char* names[] = {"SUMMONER", "CHARGER",   "SHIELDED", "SPLITTER",    "BARRAGE",   "HEALER",
+    static const char* names[] = {"SUMMONER", "CHARGER",   "SHIELDED", "SPLITTER",    "BARRAGE", "HEALER",
                                   "ENRAGE",   "SHOCKWAVE", "VORTEX",   "NECROMANCER", "EYE BEAM"};
     return names[static_cast<size_t>(p)];
 }

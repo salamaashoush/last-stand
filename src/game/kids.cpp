@@ -303,7 +303,8 @@ void draw_kid(const Gfx& g, Kid k, Vec2 feet, float scale, KidPose pose, float t
         float side = feet.x > 520.0f ? -1.0f : 1.0f;
         Vec2 b = h + Vec2{side * S(46), -S(28)};
         DrawRectangleRounded({b.x - S(34), b.y - S(12), S(68), S(24)}, 0.6f, 8, Color{255, 238, 120, 255});
-        DrawRectangleRoundedLinesEx({b.x - S(34), b.y - S(12), S(68), S(24)}, 0.6f, 8, S(1.8f), Color{180, 70, 20, 255});
+        DrawRectangleRoundedLinesEx({b.x - S(34), b.y - S(12), S(68), S(24)}, 0.6f, 8, S(1.8f),
+                                    Color{180, 70, 20, 255});
         tri(b + Vec2{-side * S(18), S(10)}, b + Vec2{-side * S(6), S(10)}, b + Vec2{-side * S(24), S(19)},
             Color{255, 238, 120, 255});
         text(g, "BABA BOOM!", b, S(11.5f), Color{200, 45, 25, 255}, Align::Center, false);
@@ -327,7 +328,9 @@ void draw_kid_portrait(const Gfx& g, Kid k, Vec2 c, float r, float time, bool ha
     disc(g, h + Vec2{hr * 0.95f, hr * 0.12f}, hr * 0.2f, L.skin_shade);
     disc(g, h, hr + 1.5f, Color{30, 20, 20, 255});
     disc(g, h, hr, L.skin);
-    KidPose p = happy ? (k == Kid::Omar ? KidPose::Rally : k == Kid::Salama ? KidPose::BabaThrow : KidPose::Peace)
+    KidPose p = happy ? (k == Kid::Omar     ? KidPose::Rally
+                         : k == Kid::Salama ? KidPose::BabaThrow
+                                            : KidPose::Peace)
                       : KidPose::Idle;
     draw_face(g, k, L, h, hr, p, time);
     draw_hair(g, L, h, hr, false);

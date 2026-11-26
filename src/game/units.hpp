@@ -200,8 +200,8 @@ inline int unit_upgrade_cost(int level) {
 
 // Squad synergies reward building cohesive multi-class loadouts.
 struct SquadSynergies {
-    bool combined_arms{false}; // 3+ unique unit types: +15% damage
-    bool bullet_storm{false};  // Rifleman + Gunner: +15% fire rate
+    bool combined_arms{false};  // 3+ unique unit types: +15% damage
+    bool bullet_storm{false};   // Rifleman + Gunner: +15% fire rate
     bool heavy_ordnance{false}; // Shotgunner + (Grenadier or Sniper): +25% knockback & armor shred
     bool elemental_fury{false}; // Any 2 of Flamer / Cryo / Volt: +22% status & elemental damage
 

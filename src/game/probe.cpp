@@ -205,13 +205,13 @@ int run_probe() {
         Metrics b = fight(game, meta, nullptr, nullptr, air);
         Metrics w = fight(game, meta, nullptr, give_card(CardId::Airstrike), air);
         report("BOMBER PILOT", "damage", b.damage, w.damage);
-        Metrics ob = fight(game, meta, nullptr,
-                           give_cards({CardId::Airstrike, CardId::Airstrike, CardId::Explosive, CardId::Explosive}),
+        Metrics ob =
+            fight(game, meta, nullptr,
+                  give_cards({CardId::Airstrike, CardId::Airstrike, CardId::Explosive, CardId::Explosive}), air);
+        Metrics ow = fight(game, meta, nullptr,
+                           give_cards({CardId::Airstrike, CardId::Airstrike, CardId::Explosive, CardId::Explosive,
+                                       CardId::OrbitalStrike}),
                            air);
-        Metrics ow = fight(
-            game, meta, nullptr,
-            give_cards({CardId::Airstrike, CardId::Airstrike, CardId::Explosive, CardId::Explosive, CardId::OrbitalStrike}),
-            air);
         report("ORBITAL FURY", "damage", ob.damage, ow.damage);
     }
     {
@@ -242,14 +242,20 @@ int run_probe() {
     {
         auto with_cannon = [](Game& g) { g.run->turrets[1] = Turret{TurretType::Cannon, 2}; };
         Metrics b = fight(game, meta, nullptr, with_cannon, normal);
-        Metrics w1 = fight(game, meta, nullptr, [&](Game& g) {
-            with_cannon(g);
-            give_card(CardId::Overclock)(g);
-        }, normal);
-        Metrics w3 = fight(game, meta, nullptr, [&](Game& g) {
-            with_cannon(g);
-            give_cards({CardId::Overclock, CardId::Overclock, CardId::Overclock})(g);
-        }, normal);
+        Metrics w1 = fight(
+            game, meta, nullptr,
+            [&](Game& g) {
+                with_cannon(g);
+                give_card(CardId::Overclock)(g);
+            },
+            normal);
+        Metrics w3 = fight(
+            game, meta, nullptr,
+            [&](Game& g) {
+                with_cannon(g);
+                give_cards({CardId::Overclock, CardId::Overclock, CardId::Overclock})(g);
+            },
+            normal);
         report("OVERCLOCK LV1", "damage", b.damage, w1.damage);
         report("OVERCLOCK LV3 vs LV1", "damage", w1.damage, w3.damage);
 
@@ -258,18 +264,19 @@ int run_probe() {
             give_cards({CardId::Fortify, CardId::Fortify, CardId::Overclock, CardId::Overclock})(g);
         };
         Metrics ab = fight(game, meta, nullptr, aegis_pre, normal);
-        Metrics aw = fight(game, meta, nullptr, [&](Game& g) {
-            aegis_pre(g);
-            give_card(CardId::FortressOverdrive)(g);
-        }, normal);
+        Metrics aw = fight(
+            game, meta, nullptr,
+            [&](Game& g) {
+                aegis_pre(g);
+                give_card(CardId::FortressOverdrive)(g);
+            },
+            normal);
         report("AEGIS WALL EVO", "damage", ab.damage, aw.damage);
         report("AEGIS WALL SHIELD", "wall lost", ab.wall_lost, aw.wall_lost, false);
     }
     {
         // FieldRepair heals the wall after kills (simulate starting wall damaged below max).
-        auto dmg_wall_setup = [](Game& g) {
-            g.run->wall_hp = g.run->stats.wall_max * 0.5f;
-        };
+        auto dmg_wall_setup = [](Game& g) { g.run->wall_hp = g.run->stats.wall_max * 0.5f; };
         auto field_rep_fight = [&](int lvls) {
             game.meta = meta;
             game.request = {2, false};
@@ -313,9 +320,9 @@ int run_probe() {
                            give_cards({CardId::HeavyRounds, CardId::HeavyRounds, CardId::HeavyRounds}), normal);
         report("HEAVY ROUNDS LV3>LV1", "damage", h1.damage, h3.damage);
         Metrics s1 = fight(game, meta, nullptr, give_card(CardId::ShockwaveRounds), normal);
-        Metrics s3 = fight(game, meta, nullptr,
-                           give_cards({CardId::ShockwaveRounds, CardId::ShockwaveRounds, CardId::ShockwaveRounds}),
-                           normal);
+        Metrics s3 =
+            fight(game, meta, nullptr,
+                  give_cards({CardId::ShockwaveRounds, CardId::ShockwaveRounds, CardId::ShockwaveRounds}), normal);
         report("PULSE ROUNDS LV3>LV1", "damage", s1.damage, s3.damage);
     }
 

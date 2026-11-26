@@ -377,8 +377,8 @@ void draw_build_menu(Game& game) {
                 DrawRectangleRounded(np, 0.5f, 4, Color{255, 90, 60, 255});
                 text(g, "NEW!", {np.x + 22, np.y + 10}, 12, WHITE);
             }
-            text(g, def.blurb, {r.x + 86, y + 44}, 14,
-                 unlocked ? Color{190, 196, 218, 255} : Color{125, 128, 145, 255}, Align::Left, false);
+            text(g, def.blurb, {r.x + 86, y + 44}, 14, unlocked ? Color{190, 196, 218, 255} : Color{125, 128, 145, 255},
+                 Align::Left, false);
             Rectangle br{r.x + r.width - 122, y + 7, 108, 48};
             bool focused = run.build_focus == k;
             if (pointer_in(game, {r.x, y, r.width, row_h - 2})) run.build_focus = k;
@@ -408,12 +408,13 @@ void draw_build_menu(Game& game) {
         auto d = difficulty_for(run);
         float dmg = turret_damage(t.type, t.level, d.stage) * run.stats.turret_damage_mult;
         float iv = turret_interval(t.type, t.level) / run.stats.turret_rate_mult;
-        std::string stat = t.type == TurretType::Flamer
-                               ? std::format("{:.0f} DPS + BURN", dmg / iv)
-                               : std::format("{:.0f} DMG / {:.1f}S", dmg, iv);
+        std::string stat = t.type == TurretType::Flamer ? std::format("{:.0f} DPS + BURN", dmg / iv)
+                                                        : std::format("{:.0f} DMG / {:.1f}S", dmg, iv);
         text(g, stat, {r.x + 112, r.y + 88}, 20, Color{200, 220, 255, 255}, Align::Left, false);
         const char* perk = t.level < 3 ? def.perk_lv3 : def.perk_lv5;
-        Color perk_col = t.level >= 5 ? GOLD_TINT : t.level >= 3 ? Color{140, 235, 255, 255} : Color{255, 210, 120, 230};
+        Color perk_col = t.level >= 5   ? GOLD_TINT
+                         : t.level >= 3 ? Color{140, 235, 255, 255}
+                                        : Color{255, 210, 120, 230};
         text_fit(g, perk, {r.x + r.width * 0.5f, r.y + 124}, 16, r.width - 28, perk_col, false);
         if (t.level < TURRET_MAX_LEVEL) {
             int cost = turret_upgrade_cost(t.type, t.level, run.turret_cost_mult);
@@ -485,12 +486,11 @@ void draw_pause(Game& game) {
     Rectangle r{56, 170, 608, 886};
     panel(r, PANEL_FILL, PANEL_EDGE, 0.06f, 4.0f);
     text(g, "PAUSED", {VIRTUAL_W * 0.5f, 218}, 54, GOLD_TINT);
-    std::string sub =
-        run.endless
-            ? std::format("ENDLESS  -  WAVE {}  (BEST {})", std::max(1, run.wave),
-                          std::max<long long>(run.wave, game.meta.stat(Lifetime::BestEndlessWave)))
-            : std::format("STAGE {}  -  {}  (WAVE {}/{})", run.stage, run.theme.name, std::max(1, run.wave),
-                          WAVES_PER_STAGE);
+    std::string sub = run.endless
+                          ? std::format("ENDLESS  -  WAVE {}  (BEST {})", std::max(1, run.wave),
+                                        std::max<long long>(run.wave, game.meta.stat(Lifetime::BestEndlessWave)))
+                          : std::format("STAGE {}  -  {}  (WAVE {}/{})", run.stage, run.theme.name,
+                                        std::max(1, run.wave), WAVES_PER_STAGE);
     text_fit(g, sub, {VIRTUAL_W * 0.5f, 258}, 18, 540, Color{200, 215, 240, 255}, false);
 
     // Live Battle Stats & Active Build Snapshot Card
@@ -530,10 +530,10 @@ void draw_pause(Game& game) {
             evos += cd.name;
         }
     }
-    std::string build_line =
-        !evos.empty() ? std::format("EVOLUTIONS: {}  |  CARDS: {}", evos, run.tally.cards_taken)
-                      : std::format("FORMATION: {}  |  LEVEL: {}  |  CARDS: {}", formation_name(run.formation),
-                                    run.level, run.tally.cards_taken);
+    std::string build_line = !evos.empty()
+                                 ? std::format("EVOLUTIONS: {}  |  CARDS: {}", evos, run.tally.cards_taken)
+                                 : std::format("FORMATION: {}  |  LEVEL: {}  |  CARDS: {}",
+                                               formation_name(run.formation), run.level, run.tally.cards_taken);
     text_fit(g, build_line, {VIRTUAL_W * 0.5f, sr.y + 139}, 15, sr.width - 28,
              !evos.empty() ? GOLD_TINT : Color{185, 210, 245, 255}, false);
 
@@ -688,7 +688,9 @@ void render_hud(Game& game) {
         const BossGenome& genome = e.mini_boss ? run.mini_boss : run.boss;
         std::string bname = e.phase2 ? std::format("{}  [PHASE 2]", genome.name) : genome.name;
         text_fit(g, bname, {VIRTUAL_W * 0.5f, y}, 25, 560,
-                 e.enraged ? Color{255, 60, 40, 255} : e.phase2 ? genome.accent : Color{255, 130, 105, 255});
+                 e.enraged  ? Color{255, 60, 40, 255}
+                 : e.phase2 ? genome.accent
+                            : Color{255, 130, 105, 255});
         Rectangle hb{86, y + 18, 548, 22};
         bar(hb, e.hp / e.max_hp, e.phase2 ? Color{235, 70, 50, 255} : Color{220, 50, 50, 255}, Color{0, 0, 0, 180});
         // 50% phase threshold notch on full bosses.
@@ -703,7 +705,8 @@ void render_hud(Game& game) {
         // Boss power pills!
         float py = hb.y + hb.height + (e.shield_hp > 0.0f ? 22.0f : 16.0f);
         float pill_w = 132.0f;
-        float total_w = static_cast<float>(genome.power_count) * pill_w + static_cast<float>(genome.power_count - 1) * 10.0f;
+        float total_w =
+            static_cast<float>(genome.power_count) * pill_w + static_cast<float>(genome.power_count - 1) * 10.0f;
         float px0 = VIRTUAL_W * 0.5f - total_w * 0.5f;
         for (int p = 0; p < genome.power_count; ++p) {
             BossPower pw = genome.powers[static_cast<size_t>(p)];
@@ -716,7 +719,8 @@ void render_hud(Game& game) {
         break;
     }
 
-    // Bottom Control Panel: XP + Wall HP/Shield + Formation + Repair + Family Powers (Ali Q, Salama W, Omar E) + Airstrike!
+    // Bottom Control Panel: XP + Wall HP/Shield + Formation + Repair + Family Powers (Ali Q, Salama W, Omar E) +
+    // Airstrike!
     DrawRectangleGradientV(0, static_cast<int>(PANEL_TOP), VIRTUAL_W, static_cast<int>(VIRTUAL_H - PANEL_TOP),
                            Color{10, 10, 20, 165}, Color{10, 10, 20, 238});
     float xp_ratio = static_cast<float>(run.xp) / static_cast<float>(xp_for_level(run.level));
