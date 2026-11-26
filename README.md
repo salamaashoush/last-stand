@@ -1,74 +1,99 @@
 # Last Stand
 
-A horde defense game: hold the wall while hundreds of monsters pour down the screen, grow your squad
-through math gates, break open locked loot, stack upgrade cards into absurd builds and bring down
-procedurally generated bosses.
+A portrait horde-defense arcade game: hold the fortress wall while hundreds of monsters pour down the
+screen, grow your squad through tactical math & stat gates, break open locked loot, evolve upgrade
+cards into absurd builds, deploy 6 evolving wall turrets, unleash family hero powers (**Omar, Ali &
+Dad Salama**), and conquer a **10-stage handcrafted campaign** plus infinite **Endless Mode**.
 
-It is the game those mobile ads promise, built in C++23 on raylib, playable on desktop and in the
-browser (mouse, touch or keyboard).
+Built in C++23 on raylib 6.2, playable on desktop and heavily optimized for mobile browsers (touch,
+mouse, or keyboard).
 
 [**Play in the browser**](https://salamaashoush.github.io/last-stand/)
 
 <p>
-  <img src="docs/screenshots/battle.png" width="240" alt="A horde charging the wall">
-  <img src="docs/screenshots/cards.png" width="240" alt="Choosing an upgrade card">
-  <img src="docs/screenshots/bosses.png" width="240" alt="Procedurally generated bosses">
+  <img src="docs/screenshots/battle.png" width="240" alt="V-formation airstrike, explosions, turrets and horde charging the wall">
+  <img src="docs/screenshots/cards.png" width="240" alt="Choosing an upgrade card with evolution hints">
+  <img src="docs/screenshots/bosses.png" width="240" alt="Handcrafted signature campaign bosses">
 </p>
 
 ## How it plays
 
-- **Hold the wall.** Your squad stands behind it and fires at everything that comes. Drag (or hold
-  A/D, arrow keys) to move along the wall; soldiers lean their aim toward the closest threat.
-- **Gates are a choice, not a freebie.** Every gate row spans the whole field, so you pass through one
-  of them. Rows usually hide a trap (`-12`, `÷2`) and a lane worth shooting: every bullet you put
-  into a gate raises its number, every bullet you put into a gate is one not spent on the horde.
-- **Locked loot.** Rewards drift down sealed in the stage's material: ice, wooden crates, stone,
-  iron cages or magma crystal. Break them open for a squad of new units, a free turret, a free card,
-  coins or gems, or let them hit the wall and lose them.
-- **Level up mid-run.** Kills give XP; each level offers three cards (multishot, ricochet, incendiary,
-  chain lightning, airstrikes, call in a new unit type and more). Pairs of cards evolve into
-  Bullet Storm, Inferno, Thunder God and Shatter.
-- **Frenzy.** Kills charge a meter; unleash it for six seconds of double fire rate.
-- **Barrels and bats.** Explosive barrels drift with the horde and wipe out everything near them
-  when shot; bat swarms weave fast over the field.
-- **Stat gates.** Some lanes are FIRE RATE or DAMAGE gates that follow the same blue and red rule.
-- **Build the wall up.** Four turret slots take cannons, tesla coils, flamers and railbeams, each
-  upgradable five times. Coins also repair the wall.
-- **Six units.** Rifleman, Gunner, Shotgunner, Sniper, Grenadier and Flamer, each with its own gun and
-  look. Unlock and level them in the Armory and field up to three per squad.
-- **A horde that adapts.** A director watches the wall. Flawless waves raise the threat level, near
-  collapses ease it off, and enemy health tracks how far ahead of the curve your firepower is, so a
-  run stays tense whether you are winning or losing.
-- **Every stage is different.** A seed per stage picks its battleground (grassland, desert, frost,
-  ashland), palette, weather, time of day, set dressing, loot material, enemy outfits and a boss
-  grown from a genome: silhouette, horns, eyes, armour and two or three powers such as summoner,
-  charger, shield, splitter, acid barrage, healer and enrage.
-- **Wave mutators.** Fast hordes, ironclad armour, swarms, elite guards and giants keep waves from
-  repeating.
-
-Between runs, gems buy permanent upgrades and units. Stars per stage, tiered missions, a daily
-supply drop with a streak, and an endless mode after stage 3 give the long game.
+- **Hold the fortified wall.** Your squad defends behind biome-styled battlements that visually
+  upgrade with steel/gilded armor bands and active **thorns spikes** as you invest in wall defense.
+  Drag (or hold `A`/`D`, arrow keys) to move along the wall, and press `F` to switch between
+  **Line** (balanced), **Wedge** (`+20%` damage / `+10%` crit), and **Guard** (`-20%` wall damage)
+  formations.
+- **Gates are a choice, not a freebie.** Every gate row spans the whole field, so you pass through
+  one lane. Shoot blue gates (`+`, `×`, `FIRE RATE`, `DAMAGE`, `CRIT CHANCE`, `TURRET DMG`) to boost
+  their values while dodging red traps (`-`, `÷`).
+- **Locked loot.** Rewards drift down sealed in the stage's material (ice, wooden crates, stone,
+  iron cages, or magma crystal). Shatter them for extra soldiers, a free turret, a free card, coins,
+  or gems before they crash into your wall.
+- **28 upgrade cards & 7 evolutions.** Level up mid-run to stack weapons, elemental effects, turret
+  overclock, field engineers, and hero charge — and pair cards to unlock 7 evolutions (**Bullet
+  Storm**, **Inferno**, **Thunder God**, **Shatter**, **Orbital Fury**, **Aegis Wall**, and
+  **Phantom Split**).
+- **Family hero powers (Omar, Ali & Salama) + V-Formation Airstrike.**
+  - **Ali (`Q`)**: Strikes a sunglasses peace sign, charming monsters with floating hearts, healing
+    the wall, and bursting bonus coins.
+  - **Salama (`W` — *"Baba Boom!"*)**: Dad hurls giant spinning, laughing Salama heads that lock
+    onto bosses and clusters, bounce once (`BOING!`), and detonate into coin & confetti mega-blasts!
+  - **Omar (`E` — *"Yalla!"*)**: Rallies the squad for `2×` fire rate, `+30%` damage, `+20%` crit,
+    and blasts back monsters crowding the wall.
+  - **Airstrike (`Space`)**: Calls in a 3-jet swept-wing fighter squadron with forward autocannon
+    strafing and finned carpet-bombing (upgraded to Napalm firestorms with *Orbital Fury*).
+- **6 evolving turrets (Lv1 → Lv3 → Lv5).** Four wall slots take **Cannon**, **Flamer**, **Tesla**,
+  **Cryo Nova**, **Railbeam**, and **Missile Pod** (homing rocket swarms). Every turret evolves
+  visually and gains unique **Lv3** and **Lv5** apex perks (twin siege shells, storm novas, napalm
+  pools, hyper-crit beams, ice shards, and 6-rocket cluster barrages).
+- **8 soldier classes & squad synergies.** **Rifleman, Gunner, Shotgunner, Sniper, Grenadier,
+  Flamer, Cryo Trooper, and Volt Trooper**, each with unique projectiles, passives, and Armory
+  levels (up to Lv10). Field up to 4 classes in your Active Squad to trigger **Combined Arms**,
+  **Bullet Hose**, **Ordnance**, and **Elemental** synergies.
+- **Progressive unlocks every stage.** Clearing each stage automatically unlocks new turrets, free
+  soldier weapons (auto-deployed into open squad slots), squad slots, or free upgrades — celebrated
+  on the Victory screen and previewed on each stage card.
+- **10 handcrafted stages + Endless Mode.** Every campaign stage features its own visual theme,
+  biome hazard, paced enemy introductions (14 enemy types total including *Healers*, *Burrowers*,
+  *Berserkers*, and *Warlords*), and a **handcrafted signature Boss + Mini-Boss** culminating in
+  **Stage 10: Eclipse Throne (*Malakor, Eclipse Sovereign*)**.
+- **Escalating Endless Mode.** Unlocked after Stage 3: shifts realms and twists every 5 waves,
+  awards Wall repairs, Gems, and free upgrade cards on 5/10-wave milestones, spawns **Double
+  Bosses** from Wave 20+, and tracks live personal-best records.
+- **Tactical Pause Menu.** Includes one-tap **Mute All (`M`)**, separate Music/SFX toggles,
+  **Game Speed (`1x / 1.5x / 2x`)**, live run stats & evolutions overview, and a full controls
+  reference.
 
 <p>
-  <img src="docs/screenshots/menu.png" width="180" alt="Main menu">
-  <img src="docs/screenshots/armory.png" width="180" alt="Armory units">
-  <img src="docs/screenshots/themes.png" width="180" alt="Stage themes">
-  <img src="docs/screenshots/gates-loot.png" width="180" alt="Gates, projectiles and locked loot">
+  <img src="docs/screenshots/menu.png" width="180" alt="Main menu and stage selector">
+  <img src="docs/screenshots/armory.png" width="180" alt="Armory squad and units screen">
+  <img src="docs/screenshots/victory.png" width="180" alt="Victory celebration and new weapon unlocks">
+  <img src="docs/screenshots/heroes.png" width="180" alt="Omar, Ali and Dad Salama hero powers">
+</p>
+
+<p>
+  <img src="docs/screenshots/turrets.png" width="180" alt="All 6 turrets across Lv1, Lv3 and Lv5">
+  <img src="docs/screenshots/themes.png" width="180" alt="Handcrafted stage themes and biome walls">
+  <img src="docs/screenshots/gates-loot.png" width="180" alt="Gates, projectiles, bombs and locked loot">
+  <img src="docs/screenshots/pause.png" width="180" alt="Tactical pause menu with speed, mute and live stats">
 </p>
 
 ## Controls
 
-Everything works with the mouse or touch. Keyboard shortcuts are listed below.
+Everything works with touch, mouse, or keyboard:
 
-- **Move squad:** A / D or Left / Right.
-- **Airstrike:** Space.
-- **Frenzy** (when the meter is full): E.
-- **Turret slots:** 1 to 4, then Up / Down and Enter to build, S to sell, Esc to close.
-- **Repair wall:** R.
-- **Upgrade cards:** 1 / 2 / 3, or Left / Right and Enter.
-- **Pause:** Esc or P.
-- **Menus:** Enter plays or confirms, Left / Right picks a stage, A opens the Armory, M the missions,
-  Tab switches Armory tabs, Up / Down and Enter buy, F fields or benches a unit.
+- **Move squad:** Drag, `A` / `D`, or Left / Right.
+- **Change formation:** `F` (Line / Wedge / Guard).
+- **Hero powers:** `Q` (Ali), `W` (Salama *Baba Boom*), `E` (Omar *Yalla* Rally).
+- **Airstrike:** `Space`.
+- **Turret slots:** Tap a wall slot or press `1`–`4`, then Up / Down and `Enter` to build/upgrade,
+  `S` to sell, `Esc` to close.
+- **Repair wall:** `R`.
+- **Game speed:** Tap the `1x` button (top-right) or press `S` while paused (`1x` / `1.5x` / `2x`).
+- **Upgrade cards:** `1` / `2` / `3`, or Left / Right and `Enter` (`R` to reroll).
+- **Pause & Mute:** `Esc` or `P` to pause; `M` in the pause menu to mute/unmute all audio.
+- **Menus:** `Enter` confirms, Left / Right picks a stage, `A` opens the Armory, `M` opens Missions,
+  `Tab` switches Armory tabs, `F` deploys or benches a unit.
 
 ## Building
 
@@ -79,36 +104,36 @@ libxcursor-dev libxi-dev`.
 ```bash
 make run        # debug build and run
 make release    # optimized build
-make test       # unit tests
+make test       # unit tests (31 Catch2 suites)
 make web        # browser build (needs emsdk; set EMSDK if it is not in ~/emsdk)
 make web-serve  # serve build-web on http://localhost:8080
 ```
 
 ## Development tools
 
-Three switches in the binary make the game testable without playing it by hand:
+Four built-in modes make balancing, visual QA, and regression testing fast without playing by hand:
 
-- `LS_HEADLESS=<runs>` simulates whole runs with no window at roughly 300x real time, an autopilot
-  playing and spending gems between runs. `LS_STAGE` picks the starting stage, `LS_REPEAT=1` replays
-  the same stage with a fresh account, and every wave and result is logged. This is how the
-  difficulty curve is tuned.
-- `LS_AUTOPILOT=1` lets the autopilot play the windowed game; add `LS_SHOT_DIR=<dir>` and
-  `LS_SHOT_EVERY=<seconds>` to capture screenshots, `LS_SPEED=<n>` to fast-forward.
-- `LS_GALLERY=<dir>` renders every enemy, unit, turret, gate, projectile, effect timelapse, card,
-  theme, boss and screen into labelled PNGs with collision radii and muzzle points overlaid, for
-  reviewing art one asset at a time.
+- `LS_PROBE=1`: Runs deterministic combat experiments verifying all 28 cards, 7 evolutions, multi-level
+  scaling, all 8 Armory upgrades, family hero powers, formations, all 8 units (Lv1 vs Lv6), and all
+  6 turrets (Lv1 → Lv3 → Lv5).
+- `LS_HEADLESS=<runs>`: Simulates full runs headlessly with the autopilot playing and spending gems
+  between stages (`LS_STAGE` picks starting stage, `LS_REPEAT=1` replays fresh).
+- `LS_AUTOPILOT=1`: Runs the autopilot in a live window; combine with `LS_SHOT_DIR=<dir>`,
+  `LS_SHOT_EVERY=<seconds>`, and `LS_SPEED=<n>` to capture live gameplay screenshots.
+- `LS_GALLERY=<dir>`: Renders all 23 visual QA sheets (enemies, units, turrets, projectiles,
+  explosion timelapses, cards, stage themes, biome walls, bosses, heroes, and UI screens) into PNGs.
 
 ## Project layout
 
 ```
 src/
-  core/        window, input, drawing helpers, state machine
+  core/        window, input, procedural atlas & drawing helpers, state machine
   game/        simulation, rendering, HUD, balance, cards, gates, units, turrets,
-               themes and bosses, meta progression, saves, autopilot, gallery
+               kids/heroes, themes & bosses, meta progression, saves, autopilot, probe, gallery
   managers/    asset loading, synthesized sound effects, save storage
   states/      menu, battle, results, armory, missions
-tests/         unit tests for the pure game logic
-web/           browser page
+tests/         Catch2 unit tests for pure game logic, unlocks, gates, cards & saves
+web/           browser shell, manifest, and mobile PWA icons
 ```
 
 Sound effects are synthesized at startup; the only audio files are the music tracks. Saves go to
